@@ -1,0 +1,1194 @@
+(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const i of document.querySelectorAll('link[rel="modulepreload"]'))n(i);new MutationObserver(i=>{for(const a of i)if(a.type==="childList")for(const l of a.addedNodes)l.tagName==="LINK"&&l.rel==="modulepreload"&&n(l)}).observe(document,{childList:!0,subtree:!0});function s(i){const a={};return i.integrity&&(a.integrity=i.integrity),i.referrerPolicy&&(a.referrerPolicy=i.referrerPolicy),i.crossOrigin==="use-credentials"?a.credentials="include":i.crossOrigin==="anonymous"?a.credentials="omit":a.credentials="same-origin",a}function n(i){if(i.ep)return;i.ep=!0;const a=s(i);fetch(i.href,a)}})();const Se={demoMode:!0,currentStep:1,completedSteps:new Set,seed:{question:"",target:"",direction:"",chatHistory:[],refinedResult:null},rq:{aiResults:null,proposalHistory:[],selectedDesign:null},guideline:{selected:null,checklist:[],notes:{}},review:{keywords:"",years:"5",language:"ja+en",database:"PubMed",suggestedQueries:null,aiResult:null},data:{types:[],typeOtherText:"",sampleSize:"",grouping:"",groupingOtherText:""},analysis:{aiResult:null},proposal:{draft:""}};class $e{constructor(){this._state=JSON.parse(JSON.stringify(Se,(t,s)=>s instanceof Set?[...s]:s)),this._state.completedSteps=new Set,this._listeners=[],this._load()}get(t){return t.split(".").reduce((s,n)=>s==null?void 0:s[n],this._state)}set(t,s){const n=t.split("."),i=n.pop(),a=n.reduce((l,o)=>l[o],this._state);a[i]=s,this._notify(t),this._save()}update(t,s){const n=this.get(t);this.set(t,s(n))}subscribe(t){return this._listeners.push(t),()=>{this._listeners=this._listeners.filter(s=>s!==t)}}_notify(t){this._listeners.forEach(s=>s(t,this._state))}_save(){try{const t={...this._state};t.completedSteps=[...this._state.completedSteps],localStorage.setItem("research-app-gemini-state",JSON.stringify(t))}catch{}}_load(){try{const t=localStorage.getItem("research-app-gemini-demo-mode");t!==null&&(this._state.demoMode=t==="true")}catch(t){console.warn("Failed to load state, using defaults",t)}}hasSavedData(){var t,s,n;try{const i=localStorage.getItem("research-app-gemini-state");if(!i)return!1;const a=JSON.parse(i);return!!((t=a.seed)!=null&&t.question||(s=a.seed)!=null&&s.refinedResult||(n=a.rq)!=null&&n.selectedDesign)}catch{return!1}}loadFullState(){try{const t=localStorage.getItem("research-app-gemini-state");if(!t)return!1;const s=JSON.parse(t);return["seed","rq","guideline","review","data","analysis","proposal","currentStep"].forEach(i=>{s[i]!==void 0&&(this._state[i]=s[i])}),s.completedSteps&&(this._state.completedSteps=new Set(s.completedSteps)),this._notify("*"),!0}catch(t){return console.warn("Failed to load full state:",t),!1}}exportToJSON(){var o,c,d,p;const t={_exportedAt:new Date().toISOString(),_version:"1.0-gemini",seed:this._state.seed,rq:this._state.rq,guideline:this._state.guideline,review:this._state.review,data:this._state.data,analysis:this._state.analysis,proposal:this._state.proposal,currentStep:this._state.currentStep,completedSteps:[...this._state.completedSteps]},s=new Blob([JSON.stringify(t,null,2)],{type:"application/json"}),n=URL.createObjectURL(s),i=document.createElement("a"),a=new Date().toISOString().slice(0,10),l=(((c=(o=this._state.seed)==null?void 0:o.refinedResult)==null?void 0:c.rq)||((p=(d=this._state.seed)==null?void 0:d.refinedResult)==null?void 0:p.title)||"研究計画").substring(0,20);i.href=n,i.download=`研究計画_${l}_${a}.json`,document.body.appendChild(i),i.click(),document.body.removeChild(i),URL.revokeObjectURL(n)}importFromJSON(t){return new Promise((s,n)=>{const i=new FileReader;i.onload=a=>{try{const l=JSON.parse(a.target.result);["seed","rq","guideline","review","data","analysis","proposal","currentStep"].forEach(c=>{l[c]!==void 0&&(this._state[c]=l[c])}),l.completedSteps&&(this._state.completedSteps=new Set(l.completedSteps)),this._save(),this._notify("*"),s(!0)}catch(l){n(l)}},i.onerror=()=>n(new Error("ファイルの読み込みに失敗しました")),i.readAsText(t)})}saveDemoMode(t){this._state.demoMode=t,localStorage.setItem("research-app-gemini-demo-mode",String(t))}reset(){localStorage.removeItem("research-app-gemini-state"),location.reload()}}const r=new $e,R={designSelection:`あなたは熟練した看護系研究者・教育者としての専門アドバイザーです。
+Step1で具体化された「リサーチクエスチョン（または実践報告・QIテーマ）」に基づき、それを実現するための最も適切な研究デザインを1案提案してください。
+
+【実行指示】
+1. 最新の知見において未解明な点や、研究の意義が高いと思われる展開を踏まえ、最も推奨される研究デザインを1つだけ提案してください。
+2. FINER基準（Feasible, Interesting, Novel, Ethical, Relevant）に基づく評価を含めてください。
+3. 国際ジャーナルへの投稿や、臨床現場での質改善への波及効果を考慮した、高度な学術的視点から記述してください。
+4. ユーザーから「すでに提案済みのデザイン」が提示された場合、それらとは異なる視点・方法論のデザインを提案してください。
+
+【出力形式（JSONのみ）】
+{
+  "design": "具体的な研究デザイン名（リサーチクエスチョンの文言）",
+  "vision": "研究のビジョン（3〜5文で具体的に）",
+  "finer": {
+    "f": "実現可能性（Feasible）の具体的な根拠",
+    "i": "面白さ（Interesting）の具体的な根拠",
+    "n": "新規性（Novel）の具体的な根拠",
+    "e": "倫理性（Ethical）の具体的な根拠",
+    "r": "関連性（Relevant）の具体的な根拠"
+  },
+  "reason": "熟練研究者としての推薦理由（FINER評価の要約と、なぜこのデザインが最適かの説明）"
+}`,rqAssistant:`あなたは看護学研究方法論の専門家であり、大学准教授として研究指導を行うブレインストーミングのパートナーです。
+
+【あなたのペルソナ】
+- 温かく親身に話を聞き、難しい理論もわかりやすく噛み砕いて説明する
+- 研究初心者が自分のテーマを「面白い」と思えるよう導くことを得意とする
+- 柔らかくフレンドリーだが、説明は論理的で明快
+- 看護研究デザイン、質的・量的研究法、臨床看護教育に精通
+- Health care・Educationに関する最新の論文動向にも精通
+
+【対話の進め方】
+ユーザーから研究の種（テーマ・疑問・課題・悩み）を受け取ったら、以下の段階的アプローチで対話してください。
+
+■ ステップ1（初回）: ユーザーの入力を受けて、共感をもってその研究テーマの価値を認めます。そして、研究を具体化するために以下の情報を教えてほしいと依頼します。すべてを埋める必要はなく、書きやすいものだけでよいと伝えてください：
+  - 研究対象（Population）: 誰を対象にしたいか
+  - 研究目的: 何を明らかにしたい、もしくは改善したいか
+  - 背景: すでに分かっていること、まだ明らかでないこと
+  - 研究の重要性: 看護実践や教育・政策にどんな意義があるか
+  - 検討中のデザイン（任意）: 質的・量的・混合など
+  - 今いちばん悩んでいること
+
+■ ステップ2: ユーザーから追加情報が返ってきたら、その内容を踏まえてPICO/PECOの要素を整理しながら、さらに1〜2点だけ深掘り質問をします。同じ質問は繰り返さず、毎回新しい論点に進んでください。
+
+■ ステップ3: 十分な情報が集まったら（2〜3往復後）、研究の骨子をまとめます。
+
+【重要なルール】
+- 同じ質問を繰り返さないでください
+- 1回の返答は簡潔に（3〜5文＋質問1つ）
+- ユーザーの回答が短くても、推論で補いながら会話を前進させてください
+- 指示の復唱はしないでください
+- 存在しない文献の引用は絶対禁止です
+- **ユーザーに対して「〇〇さん」といった名前での呼びかけは一切行わないでください**`,literatureReview:`あなたは研究計画書の構成を支援する学術アドバイザーです。
+Step1/2で得たRQと概要、および指定されたキーワードをもとに、「研究背景および意義」セクションの**論理構成（目次案・アウトライン）のみ**を提案してください。
+詳細な文章や架空の文献引用を書く必要はありません。ユーザーが実際の文献検索をして肉付けしていくための「設計図」を作ることが目的です。
+
+【構成ルールの厳守】
+1. 先行研究の整理：この分野でどのような研究を引用すればよいか（例：「〜の実態に関する文献」）
+2. 現状の課題とギャップ：先行研究で欠けている視点として何を書くべきか
+3. 本研究の必要性と意義：この研究がギャップをどう埋め、臨床や社会にどう貢献するか
+
+結果は以下のJSON形式で返してください：
+{
+  "structure": "見出しと箇条書きを用いた論理構成案（markdown形式）。各項目で「どんな文献を探して何を記述すべきか」をアドバイスする内容にしてください。"
+}`,statisticsProposal:`あなたは国際的な査読に耐えうる「研究方法」および「データ分析計画」の専門アドバイザーです。
+提供された研究デザイン、データタイプ、サンプルサイズ、群分けに基づいて、最適な統計解析手法を提案してください。
+
+【重要なルール：トークン節約のため極めて簡潔に出力すること】
+- 冗長な背景説明は避け、要点のみを箇条書き（1., 2. または - など）で短く記述すること。
+
+【出力JSONフォーマット】（必ず以下のスキーマに完全一致させてください。markdownの\`\`\`jsonブロックは不要です）
+{
+  "primaryAnalysis": {
+    "method": "主たる分析手法名（例：t検定、カイ二乗検定など）",
+    "reason": "その手法が最適な理由（箇条書きで短く）"
+  },
+  "secondaryAnalyses": [
+    {
+      "method": "副次的な分析手法（ある場合）",
+      "reason": "理由（箇条書きで短く）"
+    }
+  ],
+  "effectSize": "効果量の算出（Cohen's d等）について短く記載",
+  "multivariateNeeded": true または false (交絡因子の調整等で多変量解析が必要かどうか),
+  "multivariateMethod": "必要な場合、その手法名（例：ロジスティック回帰分析）。不要なら空文字",
+  "sampleSizeNote": "サンプルサイズ計算の目安と根拠（G*Power等を用いた考え方。箇条書きで短く）"
+}`,proposalDraft:`あなたは熟練した看護系研究者であり、学術的文章構成の専門家です。
+これまでの全情報を統合し、倫理審査委員会（IRB）提出を想定した研究計画書の草案を作成してください。
+
+【構成（必ず以下の全セクションをmarkdown見出しで含めること）】
+
+# 研究計画書
+
+## Ⅰ. 研究背景と文献的考察
+- 当該テーマの社会的背景と臨床的重要性を述べる（200字以上）
+- 関連する先行研究の動向を整理する（具体的な知見や統計を含める）
+- 現状の課題・研究ギャップを明確に述べる
+- 本研究の必要性・意義を論じる
+
+## Ⅱ. 研究目的
+- 主目的を明確に1〜2文で記述
+- 副次的目的がある場合はそれも記述
+
+## Ⅲ. 用語の定義
+- 研究で使用する主要な用語を操作的に定義する
+
+## Ⅳ. 研究方法
+### 1. 研究デザイン
+### 2. 対象者（選定基準・除外基準）
+### 3. データ収集方法と測定尺度
+### 4. データ分析方法
+### 5. サンプルサイズの根拠
+
+## Ⅴ. 倫理的配慮
+- インフォームド・コンセント
+- 個人情報保護
+- 想定されるリスクと対処
+- 利益相反
+
+## Ⅵ. 研究スケジュール（概要）
+
+## Ⅶ. 期待される成果と限界
+
+【記述ルール】
+- 専門用語には英語表記を括弧内に補う（例：せん妄（delirium））
+- 各セクションは具体的かつ十分な量で記述すること（全体で2000字以上を目標）
+- 存在確認できない文献は引用せず「出典確認中」と注記する
+- markdown形式で出力すること（#, ##, ###, -, ** を使用）`,searchQuerySuggestion:`あなたは医学・看護学領域の専門図書館員および文献検索のエキスパートです。
+ユーザーから提供された研究テーマ、リサーチクエスチョン、目的、研究デザインに基づいて、文献レビュー（先行研究の検索）に最適なキーワードと検索式を提案してください。
+
+【実行指示】
+1. 日本語および英語の検索キーワードを、それぞれ重要度が高い順に3〜5個抽出してください。
+2. 医中誌Webなどの国内データベースで使える日本語の検索式（主要キーワードをAND/ORで組み合わせたもの）を作成してください。
+3. PubMedなどの国際データベースで使える英語の検索式（MeSHタームやタイトル/アブストラクト検索を加味した本格的なもの）を作成してください。
+4. 出力は必ず以下のJSONスキーマに従ってください。マークダウン（\`\`\`jsonなど）は絶対に含めず、純粋なJSON文字列のみを出力してください。
+
+【出力JSONフォーマット】
+{
+  "keywordsJa": ["キーワード1", "キーワード2", "キーワード3"],
+  "keywordsEn": ["Keyword 1", "Keyword 2", "Keyword 3"],
+  "queryJa": "(キーワード1 OR 同義語) AND キーワード2",
+  "queryEn": "(\\"Keyword 1\\"[MeSH Terms] OR \\"Keyword 1\\"[Title/Abstract]) AND \\"Keyword 2\\""
+}`},k={designSelection:JSON.stringify({design:"急性期高齢患者に対する多職種連携退院支援の効果検証：前後比較研究",vision:"現在の属人的な退院支援を標準化し、多職種が共通の評価指標で介入することで、再入院率の低下を目指します。介入前後の比較により、プロトコル導入の効果を明確に測定できます。",finer:{f:"単施設で実現可能。既存の退院支援体制を活用し、追加コストが少ない。",i:"再入院率という明確なアウトカムを設定でき、臨床的インパクトが大きい。",n:"多職種連携の標準化プロトコルに焦点を当てた研究は国内では限定的。",e:"通常診療の範囲内の介入であり、倫理的リスクは低い。",r:"医療費削減と患者QOL向上の両面で社会的ニーズが高い。"},reason:"既存の課題に対し、介入内容が明確で実現可能性が高く、臨床的意義も極めて大きい。国際ジャーナルへの投稿にも十分耐えうるデザインである。"}),rqOverview:JSON.stringify({type:"research",theme:"標準化された多職種退院支援の再入院予防効果",rq:"標準化された多職種連携プロトコルは、急性期病院の高齢患者における30日以内の不適切な再入院を低減させるか？",target:"A病院の急性期病棟に入院中の65歳以上の将来的な退院予定患者",goal:"標準化された多職種連携プロトコルが、30日以内の不適切な再入院を低減できるかを検証すること。",approaches:[{name:"定量的評価",description:"介入導入前後の再入院率の推移を比較分析する。"},{name:"質的評価",description:"退院支援に関わった多職種の連携プロセスにおける促進・阻害要因を抽出する。"},{name:"多角的分析",description:"尺度を用いた患者・家族の満足度調査を併用し、ケアの質を統合的に評価する。"}]}),searchQuerySuggestion:JSON.stringify({keywordsJa:["退院支援","高齢者","再入院","他職種連携","看護師"],keywordsEn:["Patient Discharge","Aged","Patient Readmission","Interprofessional Relations","Nurses"],queryJa:"(退院支援 OR 退院計画 OR 移行ケア) AND (高齢者 OR 後期高齢者) AND (再入院 OR 不予定再入院)",queryEn:'("Patient Discharge"[MeSH Terms] OR "discharge planning"[Title/Abstract] OR "transitional care"[Title/Abstract]) AND ("Aged"[MeSH Terms] OR "elderly"[Title/Abstract]) AND ("Patient Readmission"[MeSH Terms] OR "readmission"[Title/Abstract])'}),literatureReview:JSON.stringify({structure:`### 1. 先行研究の整理
+- **多職種連携と再入院率に関する文献**: 過去の介入研究やシステマティックレビューを引き、一般的な効果に触れる。
+- **急性期病棟での退院支援の実態に関する文献**: 現場でどのような課題があるのかを整理する。
+
+### 2. 現状の課題とギャップ
+- これまでの研究では〇〇という限界があった、など未解明の点を指摘する。
+- 特に標準化プロトコルに関する研究の不足を指摘する。
+
+### 3. 本研究の意義と独自性
+- この研究によって得られる新しい知見は何か。
+- 臨床現場の看護師の負担軽減やアウトカム向上にどう貢献するかを述べる。`}),statisticsProposal:JSON.stringify({primaryAnalysis:{method:"対応のないt検定 / χ²検定",reason:`- 主要アウトカム（再入院の有無）の群間比較にはχ²検定を適用
+- 連続変数のベースライン比較にはt検定（正規分布）またはMann-Whitney U検定（非正規分布）を適用`},secondaryAnalyses:[{method:"カプラン・マイヤー法およびログランク検定",reason:"- 再入院までの日数（Time-to-eventデータ）を評価するため"}],effectSize:"主要アウトカムに関して、オッズ比（OR）および95%信頼区間を算出する。",multivariateNeeded:!0,multivariateMethod:"多変量ロジスティック回帰分析",sampleSizeNote:`- 先行研究に基づき、検出力80%、有意水準5%としてサンプルサイズを算出
+- 脱落率10%を見込み、各群100例を目標とする`}),proposalDraft:`【研究計画書：最終草案】
+
+Ⅰ. 研究背景
+日本の急速な高齢化に伴い、急性期病院からの早期退院と再入院予防（Hospital Readmission Prevention）は、看護実践における最重要課題の一つである...
+
+Ⅱ. 研究目的
+標準化された多職種連携退院支援プログラムの導入が、高齢患者の30日以内再入院率に及ぼす影響を検討する。
+
+Ⅲ. 研究方法
+...（中略）... STROBEガイドラインに準拠した観察研究として実施する...
+
+Ⅳ. 倫理的配慮
+本研究は、施設の倫理審査委員会の承認を得た上で開始される。対象者には研究への参加拒否および中途辞退の権利が完全に保障される。
+
+Ⅴ. 期待される成果
+看護師の業務負担を最適化しつつ、患者の安全な在宅移行を実現するためのエビデンスを提示する。`},xe="https://gemini.google.com/app";async function we(e){try{return await navigator.clipboard.writeText(e),!0}catch{const s=document.createElement("textarea");s.value=e,s.style.position="fixed",s.style.opacity="0",document.body.appendChild(s),s.select();try{return document.execCommand("copy"),document.body.removeChild(s),!0}catch{return document.body.removeChild(s),!1}}}function Re(){window.open(xe,"_blank","noopener,noreferrer")}function q(e){const{prompt:t,containerId:s,label:n="AI回答",expectJson:i=!1,placeholder:a="Geminiからの回答をここに貼り付けてください..."}=e;return`
+    <div class="gemini-ui card" id="${s}" style="margin-top: var(--space-5);">
+      <div class="gemini-ui-header" style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4);">
+        <span style="font-size: 1.5rem;">✨</span>
+        <h3 style="margin: 0; font-size: 1.1rem;">${n} — Gemini連携</h3>
+      </div>
+
+      <div class="gemini-steps" style="margin-bottom: var(--space-4);">
+        <div class="gemini-step" style="display: flex; gap: var(--space-3); align-items: flex-start; margin-bottom: var(--space-4); padding: var(--space-4); background: var(--color-bg-secondary, #f8f9fa); border-radius: var(--radius-md);">
+          <div style="min-width: 32px; height: 32px; border-radius: 50%; background: var(--color-primary, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">1</div>
+          <div style="flex: 1;">
+            <p style="font-weight: 600; margin-bottom: var(--space-2);">プロンプトをコピー</p>
+            <div class="gemini-prompt-preview" style="background: var(--color-bg, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-sm); padding: var(--space-3); margin-bottom: var(--space-3); max-height: 150px; overflow-y: auto; font-size: var(--font-size-sm); white-space: pre-wrap; color: var(--color-text-secondary, #64748b);">${qe(t.substring(0,500))}${t.length>500?`
+...(続き)`:""}</div>
+            <button class="btn btn-primary btn-sm gemini-copy-btn" data-prompt-target="${s}" style="gap: var(--space-2);">
+              📋 プロンプトをコピー
+            </button>
+            <span class="gemini-copy-feedback" style="margin-left: var(--space-2); color: var(--color-success, #22c55e); font-size: var(--font-size-sm); opacity: 0; transition: opacity 0.3s;"></span>
+          </div>
+        </div>
+
+        <div class="gemini-step" style="display: flex; gap: var(--space-3); align-items: flex-start; margin-bottom: var(--space-4); padding: var(--space-4); background: var(--color-bg-secondary, #f8f9fa); border-radius: var(--radius-md);">
+          <div style="min-width: 32px; height: 32px; border-radius: 50%; background: var(--color-primary, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">2</div>
+          <div style="flex: 1;">
+            <p style="font-weight: 600; margin-bottom: var(--space-2);">Geminiで相談する</p>
+            <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary, #64748b); margin-bottom: var(--space-3);">コピーしたプロンプトをGeminiに貼り付けて回答を取得してください。</p>
+            <button class="btn btn-outline btn-sm gemini-open-btn" style="gap: var(--space-2);">
+              🚀 Geminiを開く（別タブ）
+            </button>
+          </div>
+        </div>
+
+        <div class="gemini-step" style="display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-4); background: var(--color-bg-secondary, #f8f9fa); border-radius: var(--radius-md);">
+          <div style="min-width: 32px; height: 32px; border-radius: 50%; background: var(--color-primary, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">3</div>
+          <div style="flex: 1;">
+            <p style="font-weight: 600; margin-bottom: var(--space-2);">回答を貼り付け</p>
+            <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary, #64748b); margin-bottom: var(--space-3);">Geminiの回答をコピーして、下のテキストエリアに貼り付けてください。</p>
+            <textarea class="textarea gemini-response-input" id="${s}-response" placeholder="${a}" rows="6" style="width: 100%; box-sizing: border-box;"></textarea>
+            <button class="btn btn-primary btn-sm gemini-submit-btn" data-container="${s}" style="margin-top: var(--space-3); gap: var(--space-2);" disabled>
+              ✅ 回答を取り込む
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    `}function L(e,t,s,n=!1){const i=e.querySelector(".gemini-copy-btn"),a=e.querySelector(".gemini-open-btn"),l=e.querySelector(".gemini-response-input"),o=e.querySelector(".gemini-submit-btn"),c=e.querySelector(".gemini-copy-feedback");i&&i.addEventListener("click",async()=>{const d=await we(t);c&&(c.textContent=d?"✅ コピーしました！":"❌ コピーに失敗しました",c.style.opacity="1",setTimeout(()=>{c.style.opacity="0"},2500))}),a&&a.addEventListener("click",()=>{Re()}),l&&o&&(l.addEventListener("input",()=>{o.disabled=!l.value.trim()}),o.addEventListener("click",()=>{const d=l.value.trim();if(d)if(n)try{const p=d.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim(),u=JSON.parse(p);s(u,d)}catch{s(null,d)}else s(d,d)}))}function S(){return r.get("demoMode")}function qe(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}function Le(e){const t=r.get("seed"),s=t.chatHistory||[],n=t.refinedResult||null;e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">🌱 Step 1：種と整理</h2>
+      <p class="step-description">
+        現場で感じている疑問、課題、あるいは漠然とした仮説を入力してください。Geminiとの対話を通じてそれを整理します。
+      </p>
+
+      <div class="card" style="margin-bottom: var(--space-6);">
+        
+        <!-- 個人情報入力への警告バナー -->
+        <div class="alert" style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-5);">
+          <div style="display: flex; gap: var(--space-3); align-items: flex-start;">
+            <div style="font-size: 1.25rem;">⚠️</div>
+            <div>
+              <p style="font-weight: bold; margin-bottom: var(--space-1);">【重要】個人情報を入力しないでください</p>
+              <p style="font-size: var(--font-size-sm); margin-bottom: var(--space-2);">
+                本アプリでは、研究構想の支援のためにGeminiを利用しています。<br>
+                以下に該当する情報は絶対に入力しないでください。
+              </p>
+              <button class="btn btn-outline btn-sm" id="btnOpenPrivacyModal" style="background-color: white; border-color: #856404; color: #856404;">
+                詳細を確認
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="seedQuestion">現場の疑問・課題・違和感</label>
+          <textarea id="seedQuestion" class="textarea" placeholder="例：高齢の入院患者が退院後すぐに再入院してしまうケースが多い。退院支援のやり方を変えれば防げるのではないか？">${t.question||""}</textarea>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="btnStartChat" ${t.question?"":"disabled"}>
+          🤖 アドバイザーと対話を始める
+        </button>
+      </div>
+
+      <div id="chatArea" class="${s.length>0?"":"hidden"}">
+        <div class="card expert-chat-card">
+          <h3 class="section-title">🗣 壁打ち（Brainstorming）</h3>
+          
+          <div id="geminiChatUI"></div>
+
+          <div class="chat-container" id="chatContainer">
+            ${s.map(m=>de(m)).join("")}
+          </div>
+
+          <div class="chat-input-area" id="chatInputArea">
+            <textarea class="textarea" id="chatInput" placeholder="回答を入力してください..." rows="3"></textarea>
+            <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+              <button class="btn btn-primary" id="btnSend">送信</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="refinedResultArea" class="${n?"":"hidden"}">
+          ${n?N(n):""}
+        </div>
+      </div>
+    </div>
+
+    <!-- 個人情報警告モーダル -->
+    <div class="modal-overlay" id="privacyModal">
+      <div class="modal" style="max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+          <h2>⚠️ 個人情報に関する注意事項</h2>
+          <button class="btn-close" id="btnClosePrivacyModal" aria-label="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="overflow-y: auto; padding-right: var(--space-2);">
+          <h3 style="color: var(--color-danger); margin-bottom: var(--space-3);">❌ 入力してはいけない情報</h3>
+          
+          <div style="margin-bottom: var(--space-4);">
+            <h4 style="margin-bottom: var(--space-2);">1. 個人を特定できる情報（個人情報）</h4>
+            <ul style="padding-left: var(--space-5); list-style-type: disc;">
+              <li>氏名（患者名・家族名・職員名）</li>
+              <li>イニシャル</li>
+              <li>生年月日</li>
+              <li>住所</li>
+              <li>電話番号</li>
+              <li>メールアドレス</li>
+              <li>勤務先＋役職</li>
+              <li>病院名＋具体的な所属部署</li>
+              <li>顔写真や画像</li>
+              <li>マイナンバーなどの識別番号</li>
+            </ul>
+          </div>
+
+          <div style="margin-bottom: var(--space-4);">
+            <h4 style="margin-bottom: var(--space-2);">2. 要配慮個人情報（特に慎重に扱う情報）</h4>
+            <ul style="padding-left: var(--space-5); list-style-type: disc;">
+              <li>病歴</li>
+              <li>診断名</li>
+              <li>障害の有無</li>
+              <li>精神疾患歴</li>
+              <li>感染症罹患歴</li>
+              <li>宗教・思想</li>
+              <li>犯罪歴</li>
+              <li>虐待歴</li>
+              <li>妊娠歴・不妊治療歴</li>
+            </ul>
+            <p style="color: var(--color-danger); font-size: var(--font-size-sm); margin-top: var(--space-1);">※単独でも入力しないでください。</p>
+          </div>
+
+          <div class="card" style="background-color: #fdf2f2; border-color: #fbd5d5; margin-bottom: var(--space-4);">
+            <h4 style="color: #9b1c1c; margin-bottom: var(--space-2);">⚠️ これも「ギリギリアウト」なので注意</h4>
+            <p style="font-size: var(--font-size-sm); margin-bottom: var(--space-3);">以下は一見安全に見えますが、組み合わせると個人を特定できる可能性があります。</p>
+            <ul style="padding-left: var(--space-5); list-style-type: disc; font-size: var(--font-size-sm); color: #771d1d;">
+              <li>「当院ICUで唯一の20代男性看護師」</li>
+              <li>「○○市在住の透析患者」</li>
+              <li>「昨年心臓移植を受けた70代女性」</li>
+              <li>「救急外来で月に1回来るアルコール依存の患者」</li>
+              <li>「NICUで体重900gで出生した症例」</li>
+              <li>「市内で唯一のALS患者」</li>
+            </ul>
+            <p style="font-weight: bold; color: #9b1c1c; margin-top: var(--space-3); text-align: center;">👉 "少数・特異・唯一"という情報は特定リスクが高い</p>
+          </div>
+
+          <div>
+            <h3 style="color: var(--color-success); margin-bottom: var(--space-3);">✅ 推奨入力方法（安全な書き方）</h3>
+            <div style="display: grid; gap: var(--space-3);">
+              <div style="background-color: #fdf2f2; padding: var(--space-3); border-radius: var(--radius-sm); border-left: 4px solid var(--color-danger);">
+                <div style="font-weight: bold; margin-bottom: var(--space-1); color: var(--color-danger);">❌ NG例</div>
+                <div>「70代男性で○○市在住、心不全で再入院を繰り返すA氏」</div>
+              </div>
+              <div style="background-color: #f0fdf4; padding: var(--space-3); border-radius: var(--radius-sm); border-left: 4px solid var(--color-success);">
+                <div style="font-weight: bold; margin-bottom: var(--space-1); color: var(--color-success);">⭕️ OK例</div>
+                <div>「高齢心不全患者の再入院予防に関する課題」</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;const i=e.querySelector("#seedQuestion"),a=e.querySelector("#btnStartChat"),l=e.querySelector("#chatArea"),o=e.querySelector("#chatInput"),c=e.querySelector("#btnSend"),d=e.querySelector("#privacyModal"),p=e.querySelector("#btnOpenPrivacyModal"),u=e.querySelector("#btnClosePrivacyModal");p&&p.addEventListener("click",()=>{d.classList.add("visible")}),u&&u.addEventListener("click",()=>{d.classList.remove("visible")}),d&&d.addEventListener("click",m=>{m.target===d&&d.classList.remove("visible")}),i.addEventListener("input",()=>{r.set("seed.question",i.value),a.disabled=!i.value.trim()}),a.addEventListener("click",async()=>{l.classList.remove("hidden"),(r.get("seed.chatHistory")||[]).length===0&&await Ee(i.value),i.closest(".card").scrollIntoView({behavior:"smooth"})});const v=()=>{const m=o.value.trim();m&&(o.value="",o.style.height="auto",Te(m))};if(c.addEventListener("click",v),o.addEventListener("keydown",m=>{m.key==="Enter"&&!m.shiftKey&&!m.isComposing&&m.stopPropagation()}),o.addEventListener("input",()=>{o.style.height="auto",o.style.height=Math.min(o.scrollHeight,150)+"px"}),n){const m=e.querySelector("#refinedResultArea");H(m,n)}}function de(e){return`
+    <div class="chat-message ${e.role}">
+      <div class="chat-avatar">${e.role==="ai"?"🤖":"👤"}</div>
+      <div class="chat-bubble">${e.content.replace(/\n/g,"<br>")}</div>
+    </div>
+  `}async function Ee(e){if(S()){const t={role:"ai",content:`素敵な研究の種ですね！「${e}」は、看護実践の質に直結する大切なテーマだと思います。
+
+もう少し研究を具体化していくために、いくつか教えていただけますか？すべてに答える必要はありません。書きやすいものだけで大丈夫です。
+
+- **研究対象**: どのような患者さん・場面を想定していますか？
+- **研究目的**: 最終的に何を明らかにしたい、もしくは改善したいですか？
+- **背景**: すでに分かっていること、まだ明らかでないことは？
+- **今の悩み**: テーマが広すぎる、方法が分からない、など困っていることは？
+
+お気軽にお聞かせください。一緒に整理していきましょう！`};I(t)}else pe(e)}function pe(e){const t=r.get("seed.chatHistory")||[];let s;if(t.length===0)s=`${R.rqAssistant}
+
+---
+
+【ユーザーからの研究の種】
+${e}`;else{const i=t.map(a=>`${a.role==="ai"?"アシスタント":"ユーザー"}: ${a.content}`).join(`
+
+`);s=`${R.rqAssistant}
+
+---
+
+【これまでの対話】
+${i}
+
+---
+
+上記の対話に続けて、アシスタントとして次の返答をしてください。`}const n=document.querySelector("#geminiChatUI");n&&(n.innerHTML=q({prompt:s,containerId:"geminiChat",label:"ブレインストーミング",expectJson:!1,placeholder:"Geminiからの回答をここに貼り付けてください..."}),L(n,s,i=>{i&&(I({role:"ai",content:i}),n.innerHTML="",(r.get("seed.chatHistory")||[]).length>=6&&!r.get("seed.refinedResult")&&ue())}))}function Te(e){I({role:"user",content:e}),S()?ke():pe(r.get("seed.question"))}async function ke(e){const t=r.get("seed.chatHistory")||[],s=t.filter(i=>i.role==="user").length;await new Promise(i=>setTimeout(i,1200+Math.random()*800));let n;s<=1?n=`ありがとうございます！とても具体的なイメージが湧いてきました。
+
+65歳以上の急性期病棟の患者さんを対象に、多職種連携の退院支援の効果を検証するという方向ですね。
+
+もう少し教えてください：
+- **介入の具体的な内容**: 現在の退院支援と比べて、どんな「新しい取り組み」を導入したいですか？（例：退院支援カンファレンスの標準化、退院後フォローアップの仕組みなど）
+- **アウトカム指標**: 「再入院が減った」かどうかを、どんな指標で測りたいですか？（例：30日以内再入院率、患者満足度、在宅療養日数など）`:s<=2?n=`なるほど、かなり研究の輪郭が見えてきましたね！
+
+整理すると：
+- **P（対象）**: 65歳以上の急性期病棟入院患者
+- **I（介入）**: 標準化された多職種連携退院支援プログラム
+- **C（比較）**: 従来の退院支援
+- **O（結果）**: 30日以内再入院率の低下
+
+これは非常に実現可能性が高く、臨床的意義も大きいテーマですね。もう1点だけ確認させてください：
+- **研究環境**: データ収集が可能な施設や協力体制はありますか？また、倫理審査の見通しはいかがでしょうか？`:n=`素晴らしい情報をありがとうございます。研究の骨子がまとまりました！
+
+この内容で「整理された研究の骨子」をお出ししますので、次のステップで具体的な研究デザインを検討していきましょう。`,I({role:"ai",content:n}),t.length>=6&&!r.get("seed.refinedResult")&&setTimeout(()=>Oe(),500)}function ue(){const e=document.querySelector("#geminiChatUI");if(!e)return;const s=`これまでの対話に基づき、研究の骨子を整理してJSON出力してください。
+以下の3つのうち最適なカテゴリーを選択し、その形式で出力してください。
+
+【出力形式（JSONのみ）】
+{
+  "type": "research" | "practice" | "qi",
+  "theme": "研究テーマ（名詞句として体言止め。「〜に関する研究」など）",
+  "rq": "整理されたリサーチクエスチョン（必ず「〜は〜にどのような影響を与えるか？」などの疑問形で出力すること。実践報告やQIの場合はその目標を疑問形で構文すること）",
+  "target": "対象者（母集団）",
+  "goal": "目的・核心的な到達点",
+  "approaches": [
+    { "name": "アプローチ名", "description": "具体的な方法や工夫の概要" }
+  ]
+}
+
+---
+
+【これまでの対話】
+${(r.get("seed.chatHistory")||[]).map(n=>n.content).join(`
+`)}`;e.innerHTML=`
+    <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fef9c3); border: 1px solid #fbbf24; margin: var(--space-4) 0;">
+      <p style="margin: 0 0 var(--space-3); font-weight: 600;">💡 対話が十分に進みました。研究の骨子を生成しましょう。</p>
+      ${q({prompt:s,containerId:"geminiRefine",label:"研究の骨子を整理",expectJson:!0,placeholder:"GeminiからのJSON回答をここに貼り付けてください..."})}
+    </div>
+  `,L(e,s,(n,i)=>{if(n){r.set("seed.refinedResult",n);const a=document.querySelector("#refinedResultArea");a&&(a.classList.remove("hidden"),a.innerHTML=N(n),H(a,n)),e.innerHTML=""}else alert("JSON形式の回答を貼り付けてください。Geminiの回答から { から始まる部分をコピーしてください。")},!0)}function I(e){const t=r.get("seed.chatHistory")||[];t.push(e),r.set("seed.chatHistory",t);const s=document.querySelector("#chatContainer");s&&(s.insertAdjacentHTML("beforeend",de(e)),s.scrollTop=s.scrollHeight)}async function Oe(){if(S()){await new Promise(s=>setTimeout(s,800));const e=JSON.parse(k.rqOverview);r.set("seed.refinedResult",e);const t=document.querySelector("#refinedResultArea");t&&(t.classList.remove("hidden"),t.innerHTML=N(e),H(t,e))}else ue()}function N(e){const t=r.get("seed.rqConfirmed"),s={research:{title:"リサーチクエスチョン",badge:"学術研究"},practice:{title:"実践報告の焦点",badge:"実践報告"},qi:{title:"QIプロジェクト目標",badge:"質改善"}},n=s[e.type]||s.research;return`
+    <div class="ai-response expert-view" style="margin-top: var(--space-6);">
+      <div class="ai-response-header">
+        <span class="badge recommended">${n.badge}として整理完了</span>
+        整理された研究の骨子
+      </div>
+      <div class="ai-response-body">
+        <p class="text-muted" style="margin-bottom: var(--space-4); font-size: 0.9rem;">
+          AIが提案したリサーチクエスチョン（RQ）を必要に応じて編集し、納得できる内容になったら「このRQで確定する」ボタンを押してください。
+        </p>
+        <div class="format-block">
+          <div class="format-row" style="margin-bottom: var(--space-4);">
+            <span class="format-label">テーマ:</span>
+            <span class="format-value"><strong>${e.theme||e.title||"未設定"}</strong></span>
+          </div>
+          <div class="format-row" style="flex-direction: column; align-items: stretch; gap: var(--space-2);">
+            <span class="format-label">${n.title}:</span>
+            <textarea id="refinedRqInput" class="textarea input-rq" style="min-height: 80px; width: 100%; box-sizing: border-box; overflow: hidden; resize: none; font-size: 0.95rem; line-height: 1.6;" ${t?"readonly":""}>${e.rq||e.title||""}</textarea>
+          </div>
+          <div class="format-row mt-4">
+            <span class="format-label">対象:</span>
+            <span class="format-value">${e.target}</span>
+          </div>
+          <div class="format-row">
+            <span class="format-label">ゴール:</span>
+            <span class="format-value">${e.goal}</span>
+          </div>
+        </div>
+        
+        <div style="margin-top: var(--space-5); text-align: center;">
+          <button class="btn ${t?"btn-secondary":"btn-primary"}" id="btnConfirmRq" ${t?"disabled":""}>
+            ${t?"✓ 確定済み":"✨ このRQで確定する"}
+          </button>
+        </div>
+      </div>
+    </div>
+  `}function se(e,t){const s=document.querySelector(`#sum${e}`);s&&(s.textContent=t,s.classList.add("active"))}function Ae(){return!!r.get("seed.refinedResult")&&!!r.get("seed.rqConfirmed")}function H(e,t){const s=e.querySelector("#btnConfirmRq"),n=e.querySelector("#refinedRqInput");if(!s||!n)return;const i=()=>{n.style.height="auto",n.style.height=Math.max(80,n.scrollHeight+2)+"px"};requestAnimationFrame(i),setTimeout(i,100),n.addEventListener("input",i),s.addEventListener("click",()=>{n.value.trim()&&(t.rq=n.value.trim(),r.set("seed.refinedResult",t),r.set("seed.rqConfirmed",!0),se("Theme",(t.theme||t.title||t.rq).substring(0,60)),se("RQ",t.rq),e.innerHTML=N(t),H(e,t))})}function Me(e){const t=r.get("rq"),s=r.get("seed.refinedResult");if(!s){e.innerHTML=`
+      <div class="fade-in">
+        <h2 class="step-title">📋 Step 2：デザイン案</h2>
+        <div class="card" style="text-align: center; padding: var(--space-12);">
+          <p class="text-muted">先にStep 1で「整理された骨子」を完成させてください。</p>
+          <button class="btn btn-primary mt-4" onclick="document.querySelector('[data-step=\\'1\\']').click()">Step 1へ戻る</button>
+        </div>
+      </div>
+    `;return}const n=t.aiResults,i=t.proposalHistory||[],a=t.selectedDesign;e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📋 Step 2：研究デザイン提案</h2>
+      <p class="step-description">
+        整理された骨子に基づき、FINER基準に準拠した最適な研究デザインを提案します。
+      </p>
+
+      <div class="card highlight-card" style="margin-bottom: var(--space-6);">
+        <div class="format-row">
+          <span class="format-label">テーマ:</span>
+          <span class="format-value"><strong>${s.theme||s.title||"未設定"}</strong></span>
+        </div>
+        <div class="format-row" style="margin-top: var(--space-2);">
+          <span class="format-label">リサーチクエスチョン:</span>
+          <span class="format-value"><strong>${s.rq||s.title||"未設定"}</strong></span>
+        </div>
+        <div class="format-row">
+          <span class="format-label">対象:</span>
+          <span class="format-value">${s.target}</span>
+        </div>
+      </div>
+
+      <div id="designProposalArea">
+        ${n?M(n,a,i):`
+          <div style="text-align: center; padding: var(--space-8);">
+            <button class="btn btn-primary btn-lg" id="btnGenerateDesign">
+              🤖 最適な研究デザインを提案してもらう
+            </button>
+          </div>
+        `}
+      </div>
+    </div>
+  `;const l=e.querySelector("#btnGenerateDesign");l?l.addEventListener("click",()=>me(!1)):n&&C(e)}function me(e=!1){const t=r.get("seed.refinedResult"),s=r.get("rq.proposalHistory")||[],n=r.get("rq.aiResults");let i=`
+整理されたリサーチクエスチョン: ${t.rq||t.title||"未設定"}
+対象: ${t.target||"未設定"}
+ゴール: ${t.goal||"未設定"}
+アプローチ例: ${(t.approaches||[]).map(o=>o.name).join(", ")}
+  `.trim();if(e&&(n||s.length>0)){const o=[];s.forEach(c=>o.push(c.design)),n&&o.push(n.design),i+=`
+
+【重要】以下の研究デザインはすでに提案済みです。これらとは異なる視点・方法論の研究デザインを提案してください：
+${o.map((c,d)=>`${d+1}. ${c}`).join(`
+`)}`}const a=`${R.designSelection}
+
+---
+
+${i}`;if(S()){const o=JSON.parse(k.designSelection);if(e&&n){const d=[...s,n];r.set("rq.proposalHistory",d)}r.set("rq.aiResults",o),r.set("rq.selectedDesign",null);const c=document.querySelector("#designProposalArea");if(c){const d=r.get("rq.proposalHistory")||[];c.innerHTML=M(o,null,d),C(c)}return}const l=document.querySelector("#designProposalArea");l&&(l.innerHTML=q({prompt:a,containerId:"geminiDesign",label:"研究デザイン提案",expectJson:!0,placeholder:"GeminiからのJSON回答をここに貼り付けてください..."}),L(l,a,(o,c)=>{if(o){const d=ge(o);if(e&&n){const u=[...s,n];r.set("rq.proposalHistory",u)}r.set("rq.aiResults",d),r.set("rq.selectedDesign",null);const p=r.get("rq.proposalHistory")||[];l.innerHTML=M(d,null,p),C(l)}else{const d=Ce(c);if(d){if(e&&n){const u=[...s,n];r.set("rq.proposalHistory",u)}r.set("rq.aiResults",d),r.set("rq.selectedDesign",null);const p=r.get("rq.proposalHistory")||[];l.innerHTML=M(d,null,p),C(l)}else alert("JSON形式の回答を貼り付けてください。Geminiの回答から { から始まる部分をコピーしてください。")}},!0))}function ge(e){return Array.isArray(e)&&(e=e[0]),e.proposals&&(e=e.proposals[0]),{design:e.design||e.title||e.name||"デザイン提案",vision:e.vision||e.description||e.overview||"",finer:e.finer||{},reason:e.reason||e.recommendation||e.rationale||""}}function Ce(e){try{const s=e.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim().match(/\{[\s\S]*"design"\s*:[\s\S]*\}/);if(s){const n=JSON.parse(s[0]);return ge(n)}}catch{}return{design:"AIからの提案",vision:e.substring(0,800),finer:{},reason:"（JSONの解析に失敗したため、テキストとして表示しています。）"}}function M(e,t,s){const n=t===e.design,i=Ie(e.finer);let a="";return s.length>0&&(a=`
+      <div class="card" style="margin-top: var(--space-6); background: var(--color-bg-secondary, #f8f9fa);">
+        <h4 style="margin-bottom: var(--space-3); font-size: 0.9rem; color: var(--color-text-secondary);">
+          📁 過去の提案（${s.length}件）
+        </h4>
+        <p class="small text-muted" style="margin-bottom: var(--space-3);">以前の提案を採用したい場合はクリックしてください。</p>
+        <div class="history-list">
+          ${s.map((l,o)=>`
+            <div class="history-item ${t===l.design?"selected":""}" data-history-index="${o}" data-design="${x(l.design)}">
+              <span class="history-number">${o+1}</span>
+              <span class="history-title">${x(l.design)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `),`
+    <div class="ai-response">
+      <div class="ai-response-header">🤖 熟練研究者による研究デザイン提案</div>
+      <div class="ai-response-body">
+        <p class="mb-4">最新の知見と研究の意義に基づき、FINER基準に準拠した最適な研究デザインを提案します。</p>
+        
+        <div class="proposal-card main-proposal ${n?"selected":""}" data-design="${x(e.design)}" data-is-current="true">
+          <div class="proposal-header">
+            <span class="badge recommended">★ 推奨デザイン</span>
+          </div>
+          
+          <h3 class="proposal-title">${x(e.design)}</h3>
+          
+          ${e.vision?`
+            <div class="proposal-section">
+              <h4>🔭 研究のビジョン</h4>
+              <p>${x(e.vision)}</p>
+            </div>
+          `:""}
+
+          ${i}
+          
+          ${e.reason?`
+            <div class="proposal-section mt-2">
+              <h4>📝 推奨理由</h4>
+              <p class="small text-muted">${x(e.reason)}</p>
+            </div>
+          `:""}
+          
+          <div class="select-hint">${n?"✅ 選択済み — クリックで選択解除":"クリックしてこのデザインを採用"}</div>
+        </div>
+
+        <div style="text-align: center; margin-top: var(--space-6);">
+          <p class="small text-muted" style="margin-bottom: var(--space-3);">このデザインがしっくりこない場合は、別の視点から再提案できます。</p>
+          <button class="btn btn-outline" id="btnAlternativeDesign" style="font-size: 0.9rem;">
+            🔄 別の視点でデザインを提案してもらう
+          </button>
+        </div>
+      </div>
+    </div>
+
+    ${a}
+
+    <div class="card" style="margin-top: var(--space-6);">
+      <h3 class="section-title">✍️ 自分で研究デザインを選択する</h3>
+      <p class="text-muted" style="margin-bottom: var(--space-4);">AIの提案がイメージと違う場合、以下のリストから自分で研究デザイン（研究タイプ）を選択できます。</p>
+      
+      <div class="form-group">
+        <label for="manualDesignSelect">研究タイプを選択</label>
+        <select id="manualDesignSelect" class="select" style="max-width: 400px;">
+          <option value="">（選択してください）</option>
+          <option value="介入研究" ${t==="介入研究"?"selected":""}>介入研究（RCTなど）</option>
+          <option value="観察研究" ${t==="観察研究"?"selected":""}>観察研究（コホート・横断など）</option>
+          <option value="質的研究" ${t==="質的研究"?"selected":""}>質的研究（インタビューなど）</option>
+          <option value="QI（質改善）" ${t==="QI（質改善）"?"selected":""}>QI（質改善プロジェクト）</option>
+          <option value="事例／実践報告" ${t==="事例／実践報告"?"selected":""}>事例／実践報告</option>
+          <option value="システマティックレビュー" ${t==="システマティックレビュー"?"selected":""}>システマティックレビュー</option>
+          <option value="スコーピングレビュー" ${t==="スコーピングレビュー"?"selected":""}>スコーピングレビュー</option>
+          <option value="混合研究法" ${t==="混合研究法"?"selected":""}>混合研究法</option>
+        </select>
+        <p class="hint">これを選択すると、AIの提案ではなくここで選んだデザインが採用されます。</p>
+      </div>
+    </div>
+  `}function Ie(e){if(!e||Object.keys(e).length===0)return"";const s=Object.entries({f:{icon:"✅",label:"実現可能性"},i:{icon:"💡",label:"面白さ"},n:{icon:"🆕",label:"新規性"},e:{icon:"🛡️",label:"倫理性"},r:{icon:"🎯",label:"関連性"}}).map(([n,i])=>{const a=e[n];return!a||a===!0?"":`
+      <div class="finer-detail-row">
+        <span class="finer-label">${i.icon} ${i.label}</span>
+        <span class="finer-value">${x(String(a))}</span>
+      </div>
+    `}).filter(n=>n).join("");return s?`
+    <div class="proposal-section finer-details">
+      <h4>📊 FINER基準評価</h4>
+      ${s}
+    </div>
+  `:""}function x(e){return e?e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"):""}function C(e){const t=e.querySelector('.proposal-card[data-is-current="true"]');t&&t.addEventListener("click",()=>{const i=t.dataset.design,a=r.get("rq.selectedDesign"),l=e.querySelector("#manualDesignSelect");a===i?(r.set("rq.selectedDesign",null),t.classList.remove("selected"),t.querySelector(".select-hint").textContent="クリックしてこのデザインを採用"):(e.querySelectorAll(".proposal-card, .history-item").forEach(o=>o.classList.remove("selected")),t.classList.add("selected"),r.set("rq.selectedDesign",i),t.querySelector(".select-hint").textContent="✅ 選択済み — クリックで選択解除",l&&(l.value="")),z("Design",r.get("rq.selectedDesign")||"")}),e.querySelectorAll(".history-item").forEach(i=>{i.addEventListener("click",()=>{const a=i.dataset.design,l=r.get("rq.selectedDesign"),o=e.querySelector("#manualDesignSelect");if(l===a)r.set("rq.selectedDesign",null),i.classList.remove("selected");else{e.querySelectorAll(".proposal-card, .history-item").forEach(d=>d.classList.remove("selected")),i.classList.add("selected"),r.set("rq.selectedDesign",a);const c=e.querySelector('.proposal-card[data-is-current="true"] .select-hint');c&&(c.textContent="クリックしてこのデザインを採用"),o&&(o.value="")}z("Design",r.get("rq.selectedDesign")||"")})});const s=e.querySelector("#manualDesignSelect");s&&s.addEventListener("change",i=>{const a=i.target.value;if(a){e.querySelectorAll(".proposal-card, .history-item").forEach(o=>o.classList.remove("selected"));const l=e.querySelector('.proposal-card[data-is-current="true"] .select-hint');l&&(l.textContent="クリックしてこのデザインを採用"),r.set("rq.selectedDesign",a)}else r.set("rq.selectedDesign",null);z("Design",r.get("rq.selectedDesign")||"")});const n=e.querySelector("#btnAlternativeDesign");n&&n.addEventListener("click",i=>{i.stopPropagation(),me(!0)})}function z(e,t){const s=document.querySelector(`#sum${e}`);s&&(s.textContent=t,s.classList.add("active"))}function Ne(){return!!r.get("rq.selectedDesign")}const A={介入研究:{name:"CONSORT",full:"Consolidated Standards of Reporting Trials",desc:"ランダム化比較試験(RCT)の報告基準"},横断研究:{name:"STROBE",full:"Strengthening the Reporting of Observational Studies in Epidemiology",desc:"観察研究の報告基準"},"実態調査（記述研究/Descriptive Study）":{name:"STROBE",full:"Strengthening the Reporting of Observational Studies in Epidemiology",desc:"観察研究の報告基準"},観察研究:{name:"STROBE",full:"Strengthening the Reporting of Observational Studies in Epidemiology",desc:"観察研究の報告基準"},"QI（質改善/Quality Improvement）":{name:"SQUIRE 2.0",full:"Standards for QUality Improvement Reporting Excellence",desc:"質改善研究の報告基準"},"QI（質改善）":{name:"SQUIRE 2.0",full:"Standards for QUality Improvement Reporting Excellence",desc:"質改善研究の報告基準"},質的研究:{name:"COREQ",full:"Consolidated Criteria for Reporting Qualitative Research",desc:"質的研究の報告基準"},探索的研究:{name:"COREQ",full:"Consolidated Criteria for Reporting Qualitative Research",desc:"質的研究の報告基準"},スコーピングレビュー:{name:"PRISMA-ScR",full:"Preferred Reporting Items for Systematic reviews and Meta-Analyses extension for Scoping Reviews",desc:"スコーピングレビューの報告基準"},システマティックレビュー:{name:"PRISMA 2020",full:"Preferred Reporting Items for Systematic Reviews and Meta-Analyses",desc:"システマティックレビュー・メタアナリシスの報告基準"},混合研究法:{name:"GRAMMS",full:"Good Reporting of A Mixed Methods Study",desc:"混合研究法の報告基準"},前後比較研究:{name:"STROBE",full:"Strengthening the Reporting of Observational Studies in Epidemiology",desc:"観察研究の報告基準"},"事例／実践報告":{name:"CARE",full:"CAse REport Guidelines",desc:"症例報告の報告基準"}},J={CONSORT:["タイトルに「ランダム化」を含む","構造化された抄録","科学的背景と根拠の説明","具体的な目的・仮説","試験デザインの記述","適格基準の記述","セッティングとデータ収集場所","介入の詳細（再現可能な程度に）","完全に定義されたアウトカム","サンプルサイズの決定方法","ランダム化の手順","割付の隠蔽化","盲検化の記述","統計手法の記述","参加者のフロー図","ベースライン特性の表","各群の結果（効果量と精度）","有害事象の報告","限界、一般化可能性、解釈","試験登録番号"],STROBE:["研究デザインの明示","セッティング・期間・参加者","変数の定義","データソース・測定方法","バイアスへの対処","サンプルサイズの根拠","統計手法の記述","参加者の流れの記述","記述的データの提示","主要結果（粗結果と調整結果）","主要所見の要約","限界の考察","一般化可能性","資金源の開示"],"SQUIRE 2.0":["タイトルに質改善手法を明記","背景と改善の必要性","具体的な改善目標","改善活動の文脈","介入の理論的根拠","倫理的側面の考慮","改善方法のフレームワーク","指標の定義","プロセスとアウトカムの測定","分析方法","結果の記述（ランチャート等）","考察と学びの共有"],COREQ:["研究チームと反射性","研究デザインの理論的枠組み","参加者の選定方法","セッティングの記述","データ収集方法の詳細","インタビューガイドの記述","データの飽和","データ分析方法","信頼性と信用性の確保","主要カテゴリまたはテーマ","参加者の引用"],"PRISMA-ScR":["タイトルにスコーピングレビューを明記","レビューの目的・RQ","適格基準","情報源とデータベース","検索戦略","スクリーニングプロセス","データの抽出方法","結果の要約","エビデンスのマッピング"],"PRISMA 2020":["構造化された抄録","登録番号・プロトコル","適格基準","情報源","検索戦略","研究の選択プロセス","データ抽出プロセス","バイアスリスク評価","エビデンスの確実性","結果の統合方法","フロー図の提示"],GRAMMS:["混合研究法の根拠","研究デザインの記述","量的・質的研究の各方法","統合のタイミングと方法","各要素の限界","統合から得られた洞察"],CARE:["患者情報・背景","臨床所見","タイムライン","診断的評価","治療介入","フォローアップと転帰","考察（学びのポイント）"]},He=[{type:"介入研究",guideline:"CONSORT",recommendFor:["research"]},{type:"観察研究",guideline:"STROBE",recommendFor:["research"]},{type:"QI（質改善）",guideline:"SQUIRE 2.0",recommendFor:["qi"]},{type:"質的研究",guideline:"COREQ",recommendFor:["research"]},{type:"スコーピングレビュー",guideline:"PRISMA-ScR",recommendFor:[]},{type:"システマティックレビュー",guideline:"PRISMA 2020",recommendFor:[]},{type:"混合研究法",guideline:"GRAMMS",recommendFor:[]},{type:"事例／実践報告",guideline:"CARE",recommendFor:["practice"]}];function De(e){var l;const t=r.get("rq.selectedDesign")||"",s=ae(t),n=((l=r.get("seed.refinedResult"))==null?void 0:l.type)||"";s&&r.set("guideline.selected",s.name);const i=J[s==null?void 0:s.name]||[],a=r.get("guideline.notes")||{};e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📑 Step 3：ガイドライン選択</h2>
+      <p class="step-description">
+        研究デザインに基づいて、準拠すべき報告ガイドラインを選択します。
+        下の表から研究タイプをクリックして選んでください。${n?"★マークは Step 1 の結果に基づく推奨です。":""}
+      </p>
+
+      <!-- Guideline mapping table -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">📊 研究タイプとガイドライン対応表</h3>
+        <p class="hint" style="margin-bottom: var(--space-4);">行をクリックして研究デザインを選択してください</p>
+        <table class="data-table data-table-selectable" id="designTable">
+          <thead>
+            <tr>
+              <th>研究タイプ</th>
+              <th>準拠ガイドライン</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${He.map(o=>{const c=(s==null?void 0:s.name)===o.guideline&&t===o.type,d=n&&o.recommendFor.includes(n);return`
+              <tr class="${c?"selected-row":""} ${d?"recommended-row":""}"
+                  data-type="${o.type}" data-guideline="${o.guideline}">
+                <td>
+                  ${d?'<span class="tag tag-recommend">★ 推奨</span> ':""}${o.type}
+                </td>
+                <td>${o.guideline}</td>
+                <td style="text-align: center;">${c?'<span class="tag tag-primary">✓ 選択中</span>':""}</td>
+              </tr>
+            `}).join("")}
+          </tbody>
+        </table>
+
+        ${n?ze(n):""}
+      </div>
+
+      <div id="guidelineDetailArea">
+        ${s?ie(s,i,a):`
+          <div class="card" style="text-align: center; padding: var(--space-12);">
+            <p style="color: var(--color-text-muted);">上の表から研究タイプを選択してください。</p>
+          </div>
+        `}
+      </div>
+    </div>
+  `,s&&re(s.name),e.querySelectorAll("#designTable tbody tr").forEach(o=>{o.addEventListener("click",()=>{const c=o.dataset.type;o.dataset.guideline,r.set("rq.selectedDesign",c),r.set("guideline.checklist",[]),r.set("guideline.notes",{});const d=A[c]||ae(c);d&&r.set("guideline.selected",d.name),e.querySelectorAll("#designTable tbody tr").forEach(u=>{u.classList.remove("selected-row");const v=u.querySelector("td:last-child");v&&(v.innerHTML="")}),o.classList.add("selected-row");const p=o.querySelector("td:last-child");if(p&&(p.innerHTML='<span class="tag tag-primary">✓ 選択中</span>'),d){const u=e.querySelector("#guidelineDetailArea"),v=J[d.name]||[];u.innerHTML=ie(d,v,{}),ne(e),re(d.name)}Je("Design",c)})}),ne(e)}function ie(e,t,s){const n=Object.values(s).filter(i=>i&&i.trim()).length;return`
+    <div class="guideline-card">
+      <div class="guideline-card-header">
+        <h3>${e.name}</h3>
+        <p>${e.full}</p>
+        <p style="margin-top: var(--space-2); font-size: var(--font-size-xs);">${e.desc}</p>
+      </div>
+      <div class="checklist" id="guidelineChecklist">
+        <h4 style="padding: var(--space-3) 0; font-weight: 700;">チェックリスト <span class="checklist-progress">${n} / ${t.length} 項目入力済み</span></h4>
+        <p class="hint" style="margin-bottom: var(--space-3);">考えがある項目はメモを入力してください。未入力の項目は文献レビューで補完します。</p>
+        ${t.map((i,a)=>{const l=s[a]||"",o=l.trim().length>0;return`
+          <div class="checklist-item-note ${o?"has-note":""}">
+            <div class="checklist-item-header">
+              <div class="checklist-check ${o?"checked":""}" data-index="${a}">
+                ${o?"✓":""}
+              </div>
+              <span class="checklist-label">${i}</span>
+            </div>
+            <textarea class="checklist-note-input" data-index="${a}" 
+              placeholder="現時点の考え・方針があればメモしてください（未入力でもOK）"
+              rows="1">${l}</textarea>
+          </div>
+        `}).join("")}
+      </div>
+    </div>
+  `}function ne(e){e.querySelectorAll(".checklist-note-input").forEach(t=>{t.value&&(t.style.height="auto",t.style.height=Math.min(t.scrollHeight,120)+"px"),t.addEventListener("input",()=>{const s=t.dataset.index,n=t.value,i=r.get("guideline.notes")||{};i[s]=n,r.set("guideline.notes",i);const a=t.closest(".checklist-item-note"),l=a.querySelector(".checklist-check");n.trim()?(a.classList.add("has-note"),l.classList.add("checked"),l.textContent="✓"):(a.classList.remove("has-note"),l.classList.remove("checked"),l.textContent=""),t.style.height="auto",t.style.height=Math.min(t.scrollHeight,120)+"px",Pe(e);const o=Object.entries(i).filter(([,c])=>c&&c.trim()).map(([c])=>parseInt(c));r.set("guideline.checklist",o)})})}function Pe(e){const t=r.get("guideline.notes")||{},s=Object.values(t).filter(a=>a&&a.trim()).length,n=e.querySelectorAll(".checklist-note-input").length,i=e.querySelector(".checklist-progress");i&&(i.textContent=`${s} / ${n} 項目入力済み`)}function re(e){const t=document.querySelector("#sumGuideline");t&&(t.textContent=e,t.classList.add("active"))}function ze(e){const s={research:{icon:"🔬",title:"学術研究として整理されました",designs:"介入研究・観察研究・質的研究",reason:"Step 1 の対話から、仮説の検証や新たな知見の発見を目的とした学術研究と判断しました。研究の目的や方法に応じて、介入研究（RCT等）、観察研究（横断・コホート等）、質的研究（インタビュー・参与観察等）のいずれかを選択してください。"},qi:{icon:"📈",title:"質改善（QI）プロジェクトとして整理されました",designs:"QI（質改善）",reason:"Step 1 の対話から、現場の業務プロセスやケアの質を改善することが主目的と判断しました。QIプロジェクトでは SQUIRE 2.0 ガイドラインに沿って報告することが推奨されています。"},practice:{icon:"📝",title:"実践報告として整理されました",designs:"事例／実践報告",reason:"Step 1 の対話から、臨床での実践経験や症例を共有・報告することが主目的と判断しました。事例報告では CARE ガイドラインに沿って構造化することで、読者にとって再現可能で学びの多い報告になります。"}}[e];return s?`
+    <div class="recommend-reason" style="margin-top: var(--space-4);">
+      <div class="recommend-reason-header">
+        <span>${s.icon}</span>
+        <strong>${s.title}</strong>
+      </div>
+      <div class="recommend-reason-body">
+        <p><strong>推奨デザイン：</strong>${s.designs}</p>
+        <p>${s.reason}</p>
+      </div>
+    </div>
+  `:""}function ae(e){if(!e)return null;if(A[e])return A[e];for(const[t,s]of Object.entries(A))if(e.includes(t)||t.includes(e))return s;return A.横断研究}function Je(e,t){const s=document.querySelector(`#sum${e}`);s&&(s.textContent=t,s.classList.add("active"))}function _e(){return!!r.get("guideline.selected")}function Qe(e){return J[e]||[]}function Ge(e){const t=r.get("review");e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📚 Step 4：研究背景と意義の構築</h2>
+      <p class="step-description">
+        先行研究の整理から研究の必要性、独自性までを論理的に構築します。
+      </p>
+
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <div style="margin-bottom: var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px dashed var(--color-border);">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-3);">
+            <div>
+              <h3 style="font-size: 1rem; margin-bottom: var(--space-1);">💡 検索キーワード・式の自動提案</h3>
+              <p class="hint">これまでの入力内容から、文献検索に最適なキーワードと検索式を提案します。</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btnSuggestQueries">
+              🤖 提案してもらう
+            </button>
+          </div>
+          
+          <div id="suggestedQueriesArea" style="display: none;">
+            <!-- 提案結果がここに表示される -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="reviewKeywords">キーワード・関連テーマ <span style="font-size: 0.8rem; font-weight: normal; color: var(--color-text-muted);">（上記で提案されたものをコピーするか、手入力してください）</span></label>
+          <input type="text" id="reviewKeywords" class="input"
+                 placeholder="例：退院支援 高齢者 再入院"
+                 value="${t.keywords||""}" />
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+          <div class="form-group">
+            <label for="reviewLang">文献の対象範囲</label>
+            <select id="reviewLang" class="select">
+              <option value="ja+en" ${t.language==="ja+en"?"selected":""}>国内・国際の両方</option>
+              <option value="en" ${t.language==="en"?"selected":""}>国際（英語）のみ</option>
+              <option value="ja" ${t.language==="ja"?"selected":""}>国内（日本語）のみ</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="reviewContext">重視する視点</label>
+            <select id="reviewContext" class="select">
+              <option value="academic" ${t.context==="academic"?"selected":""}>学術的・論理的整合性</option>
+              <option value="clinical" ${t.context==="clinical"?"selected":""}>臨床上の喫緊の課題</option>
+              <option value="ethical" ${t.context==="ethical"?"selected":""}>倫理・人権の観点</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="btnReview">
+          🖋 背景・意義の論理構成を生成
+        </button>
+      </div>
+
+      <div id="step4Results">
+        ${t.aiResult?Q(t.aiResult):""}
+      </div>
+    </div>
+  `;const s=e.querySelector("#reviewKeywords"),n=e.querySelector("#reviewLang"),i=e.querySelector("#reviewContext");s.addEventListener("input",()=>r.set("review.keywords",s.value)),n.addEventListener("change",()=>r.set("review.language",n.value)),i==null||i.addEventListener("change",()=>r.set("review.context",i.value)),e.querySelector("#btnReview").addEventListener("click",Be);const a=e.querySelector("#btnSuggestQueries");a&&a.addEventListener("click",je),t.suggestedQueries&&_(t.suggestedQueries)}function je(){const e=document.querySelector("#suggestedQueriesArea");if(!e)return;const t=r.get("seed.refinedResult"),s=(t==null?void 0:t.rq)||(t==null?void 0:t.title)||"",n=(t==null?void 0:t.goal)||"",i=(t==null?void 0:t.goal)||"",a=r.get("rq.selectedDesign")||"",l=`
+研究テーマ: ${s}
+リサーチクエスチョン: ${n}
+研究の目的: ${i}
+研究デザイン: ${a}
+  `.trim(),o=`${R.searchQuerySuggestion}
+
+---
+
+${l}`;if(S()){const c=JSON.parse(k.searchQuerySuggestion);r.set("review.suggestedQueries",c),_(c);const d=document.querySelector("#reviewKeywords");if(d&&!d.value.trim()&&c.keywordsJa){const p=c.keywordsJa.join(" ");d.value=p,r.set("review.keywords",p)}return}e.style.display="block",e.innerHTML=q({prompt:o,containerId:"geminiSuggest",label:"検索キーワード・式の提案",expectJson:!0,placeholder:"GeminiからのJSON回答をここに貼り付けてください..."}),L(e,o,(c,d)=>{if(c){r.set("review.suggestedQueries",c),_(c);const p=document.querySelector("#reviewKeywords");if(p&&!p.value.trim()&&c.keywordsJa){const u=c.keywordsJa.join(" ");p.value=u,r.set("review.keywords",u)}}else e.innerHTML=`
+        <div class="card" style="border-color: var(--color-danger);">
+          <p style="color: var(--color-danger);">⚠️ JSON形式での回答を貼り付けてください。</p>
+        </div>
+      `},!0)}function _(e){const t=document.querySelector("#suggestedQueriesArea");t&&(t.style.display="block",t.innerHTML=`
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); background: var(--color-primary-bg); padding: var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-primary-border);">
+      <!-- 日本語 -->
+      <div style="background: var(--color-surface); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+        <h4 style="font-size: 0.9rem; margin-bottom: var(--space-2); color: var(--color-primary-dark);">🇯🇵 医中誌Web用（日本語）</h4>
+        <div style="margin-bottom: var(--space-2);">
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">推奨キーワード:</span><br>
+          <span style="font-size: 0.9rem; font-weight: 500;">${(e.keywordsJa||[]).join(", ")}</span>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">検索式（コピーして使えます）:</span>
+          <textarea readonly class="input" style="font-family: monospace; font-size: 0.8rem; padding: var(--space-2); min-height: 60px; background: var(--color-bg); margin-top: var(--space-1); resize: none;" onclick="this.select()">${e.queryJa||""}</textarea>
+        </div>
+      </div>
+      
+      <!-- 英語 -->
+      <div style="background: var(--color-surface); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+        <h4 style="font-size: 0.9rem; margin-bottom: var(--space-2); color: var(--color-primary-dark);">🌍 PubMed用（英語）</h4>
+        <div style="margin-bottom: var(--space-2);">
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">推奨キーワード:</span><br>
+          <span style="font-size: 0.9rem; font-weight: 500;">${(e.keywordsEn||[]).join(", ")}</span>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">検索式（コピーして使えます）:</span>
+          <textarea readonly class="input" style="font-family: monospace; font-size: 0.8rem; padding: var(--space-2); min-height: 60px; background: var(--color-bg); margin-top: var(--space-1); resize: none;" onclick="this.select()">${e.queryEn||""}</textarea>
+        </div>
+      </div>
+    </div>
+  `)}function Be(){const e=r.get("review"),t=r.get("seed.refinedResult"),s=(t==null?void 0:t.rq)||(t==null?void 0:t.title)||"",n=(t==null?void 0:t.goal)||"",i=(t==null?void 0:t.goal)||"",a=r.get("rq.selectedDesign")||"",l=r.get("guideline.selected")||"",o=r.get("guideline.notes")||{},c=Qe(l);let d="";if(c.length>0){const m=[],h=[];c.forEach((f,b)=>{const E=o[b];E&&E.trim()?m.push(`✓ ${f}: ${E.trim()}`):h.push(`□ ${f}`)}),m.length>0&&(d+=`
+検討済みの項目:
+${m.join(`
+`)}`),h.length>0&&(d+=`
+未検討の項目（文献レビューで補完が必要）:
+${h.join(`
+`)}`)}const p=`
+研究テーマ: ${s}
+リサーチクエスチョン: ${n}
+研究の目的: ${i}
+研究デザイン: ${a}
+準拠ガイドライン: ${l}
+重視するキーワード: ${e.keywords}
+対象範囲: ${e.language}
+重視する視点: ${e.context||"特定なし"}
+${d}
+  `.trim(),u=`${R.literatureReview}
+
+---
+
+${p}`;if(S()){const m=JSON.parse(k.literatureReview);r.set("review.aiResult",m),document.querySelector("#step4Results").innerHTML=Q(m);const h=document.querySelector("#sumLiterature");h&&(h.textContent="背景構築済み",h.classList.add("active"));return}const v=document.querySelector("#step4Results");v.innerHTML=q({prompt:u,containerId:"geminiReview",label:"背景・意義の論理構成",expectJson:!0,placeholder:"Geminiからの回答をここに貼り付けてください（JSON形式またはテキスト）..."}),L(v,u,(m,h)=>{let f;m?f=m:f={structure:h},r.set("review.aiResult",f),v.innerHTML=Q(f);const b=document.querySelector("#sumLiterature");b&&(b.textContent="背景構築済み",b.classList.add("active"))},!0)}function Q(e){return`
+    <div class="ai-response">
+      <div class="ai-response-header">📖 背景と意義の論理構成案（設計図）</div>
+      <div class="ai-response-body">
+        <p class="text-muted" style="margin-bottom: var(--space-4); font-size: 0.9rem;">
+          以下は検索した文献を使ってどのような順番で背景を記述するべきかの「構成案」です。これを参考に実際の文献を検索し、ご自身で文章を肉付けしてください。
+        </p>
+        <div class="academic-text" style="line-height: 1.8;">
+          ${(e.structure||e.narrative||"").replace(/\n/g,"<br>")}
+        </div>
+      </div>
+    </div>
+  `}function Fe(){return!!r.get("review.aiResult")}const U=[{id:"attributes",label:"基本属性（年齢・性別など）",icon:"👤"},{id:"vitals",label:"バイタルサイン",icon:"💓"},{id:"labs",label:"検査値",icon:"🧪"},{id:"scales",label:"スケール（HADS, BIなど）",icon:"📏"},{id:"observation",label:"観察記録",icon:"👁"},{id:"interview",label:"インタビュー",icon:"🎤"},{id:"questionnaire",label:"アンケート（Likert尺度）",icon:"📋"},{id:"intervention",label:"介入有無",icon:"💊"},{id:"timeseries",label:"時系列データ",icon:"📈"},{id:"medical_record",label:"診療記録・カルテ（看護記録や計画など）",icon:"🏥"},{id:"existing_db",label:"既存データベース利用",icon:"🗄"},{id:"other",label:"その他",icon:"✏️"}],ve=[{value:"none",label:"なし（単群・記述的・実態調査など）"},{value:"2groups",label:"2群（ばく露 vs 非ばく露 / 介入 vs 対照 等）"},{value:"3groups",label:"3群以上"},{value:"prepost",label:"前後比較（同一対象への1つの介入前後など）"},{value:"repeated",label:"反復測定・クロスオーバー（同一対象に対する複数の条件・姿勢・時間での測定など）"},{value:"other",label:"その他"}];function Ue(e){const t=r.get("data");e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📊 Step 5：収集可能データの選択</h2>
+      <p class="step-description">
+        実際に収集可能なデータの種類を選択してください。次のステップで最適な分析方法を提案します。
+      </p>
+
+      <!-- Data Types -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">📁 1. データタイプ</h3>
+        <p class="hint" style="margin-bottom: var(--space-4);">収集予定のデータをすべて選択してください（複数選択可）</p>
+        <div class="checkbox-group" id="dataTypeGroup">
+          ${U.map(i=>`
+            <label class="checkbox-item ${(t.types||[]).includes(i.id)?"checked":""}">
+              <input type="checkbox" value="${i.id}" ${(t.types||[]).includes(i.id)?"checked":""} />
+              <span>${i.icon} ${i.label}</span>
+            </label>
+          `).join("")}
+        </div>
+        <div id="typeOtherWrapper" style="display: ${(t.types||[]).includes("other")?"block":"none"}; margin-top: var(--space-3);">
+          <input type="text" id="typeOtherText" class="input" placeholder="具体的なデータタイプを入力してください" value="${t.typeOtherText||""}" />
+        </div>
+      </div>
+
+      <!-- Sample Size -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">👥 2. サンプル数（予定）</h3>
+        <div class="form-group">
+          <div style="display: flex; align-items: center; gap: var(--space-4);">
+            <input type="number" id="sampleSize" class="input" style="max-width: 200px;"
+                   placeholder="例：100" min="1"
+                   value="${t.sampleSize||""}" />
+            <span class="hint">名（件）</span>
+          </div>
+          <p class="hint" style="margin-top: var(--space-2);">
+            概算で構いません。正確なサンプルサイズはStep 6で計算を支援します。
+          </p>
+        </div>
+      </div>
+
+      <!-- Grouping -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">⚖️ 3. 群分け</h3>
+        <div class="radio-group" id="groupingGroup">
+          ${ve.map(i=>`
+            <label class="radio-item ${t.grouping===i.value?"checked":""}">
+              <input type="radio" name="grouping" value="${i.value}" ${t.grouping===i.value?"checked":""} />
+              ${i.label}
+            </label>
+          `).join("")}
+        </div>
+        <div id="groupingOtherWrapper" style="display: ${t.grouping==="other"?"block":"none"}; margin-top: var(--space-3);">
+          <input type="text" id="groupingOtherText" class="input" placeholder="具体的な群分け・設計を入力してください" value="${t.groupingOtherText||""}" />
+        </div>
+      </div>
+
+      <!-- Summary preview -->
+      <div class="card card-highlight" id="dataSummaryPreview">
+        <h3 class="section-title">📋 データ収集計画の概要</h3>
+        <div id="dataSummaryContent">${ye(t)}</div>
+      </div>
+    </div>
+  `,e.querySelectorAll('#dataTypeGroup input[type="checkbox"]').forEach(i=>{i.addEventListener("change",()=>{const a=Array.from(e.querySelectorAll("#dataTypeGroup input:checked")).map(o=>o.value);r.set("data.types",a),e.querySelectorAll("#dataTypeGroup .checkbox-item").forEach(o=>{o.classList.toggle("checked",o.querySelector("input").checked)});const l=e.querySelector("#typeOtherWrapper");if(l&&(l.style.display=a.includes("other")?"block":"none",!a.includes("other"))){r.set("data.typeOtherText","");const o=e.querySelector("#typeOtherText");o&&(o.value="")}O()})});const s=e.querySelector("#typeOtherText");s&&s.addEventListener("input",i=>{r.set("data.typeOtherText",i.target.value),O()}),e.querySelector("#sampleSize").addEventListener("input",i=>{r.set("data.sampleSize",i.target.value),O()}),e.querySelectorAll('input[name="grouping"]').forEach(i=>{i.addEventListener("change",a=>{r.set("data.grouping",a.target.value),e.querySelectorAll("#groupingGroup .radio-item").forEach(o=>{o.classList.toggle("checked",o.querySelector("input").checked)});const l=e.querySelector("#groupingOtherWrapper");if(l&&(l.style.display=a.target.value==="other"?"block":"none",a.target.value!=="other")){r.set("data.groupingOtherText","");const o=e.querySelector("#groupingOtherText");o&&(o.value="")}O()})});const n=e.querySelector("#groupingOtherText");n&&n.addEventListener("input",i=>{r.set("data.groupingOtherText",i.target.value),O()})}function O(){const e=r.get("data"),t=document.querySelector("#dataSummaryContent");t&&(t.innerHTML=ye(e));const s=document.querySelector("#sumData");if(s){const n=e.types||[];if(n.length>0){const i=n.map(a=>{var l;return((l=U.find(o=>o.id===a))==null?void 0:l.label.split("（")[0])||a});s.textContent=i.join("、"),s.classList.add("active")}}}function ye(e){var n;const t=(e.types||[]).map(i=>U.find(a=>a.id===i));let s=((n=ve.find(i=>i.value===e.grouping))==null?void 0:n.label)||"未選択";return e.grouping==="other"&&e.groupingOtherText&&(s+=`（${oe(e.groupingOtherText)}）`),t.length===0&&!e.sampleSize&&!e.grouping?'<p style="color: var(--color-text-muted);">データを選択すると、ここに概要が表示されます。</p>':`
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+      <div>
+        <strong>データタイプ（${t.length}種類）</strong>
+        <ul style="margin-top: var(--space-2); padding-left: var(--space-5);">
+          ${t.map(i=>{if(!i)return"";let a=i.label;return i.id==="other"&&e.typeOtherText&&(a+=`（${oe(e.typeOtherText)}）`),`<li>${i.icon} ${a}</li>`}).join("")||'<li style="color: var(--color-text-muted);">未選択</li>'}
+        </ul>
+      </div>
+      <div>
+        <p><strong>サンプル数:</strong> ${e.sampleSize||"未入力"}</p>
+        <p style="margin-top: var(--space-2);"><strong>群分け:</strong> ${s}</p>
+      </div>
+    </div>
+  `}function Ke(){const e=r.get("data");return(e.types||[]).length>0&&e.grouping}function oe(e){return e?e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"):""}const le={"2groups":{continuous:{normal:"t検定（独立2群）",nonNormal:"Mann-Whitney U検定"},categorical:"χ²検定 / Fisher正確確率検定"},"3groups":{continuous:{normal:"一元配置分散分析（ANOVA）",nonNormal:"Kruskal-Wallis検定"},categorical:"χ²検定"},prepost:{continuous:{normal:"対応のあるt検定",nonNormal:"Wilcoxon符号付順位和検定"},categorical:"McNemar検定"},none:{continuous:{normal:"記述統計、相関分析",nonNormal:"Spearman順位相関"},categorical:"度数分布、記述統計"}};function We(e){const t=r.get("analysis"),s=r.get("data");e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📐 Step 6：分析方法提案</h2>
+      <p class="step-description">
+        Step 5で選択したデータ特性に基づいて、最適な統計分析手法を提案します。
+      </p>
+
+      <!-- Quick decision table -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">📊 分析手法クイックリファレンス</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>状況</th>
+                <th>推奨分析手法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>2群・連続変数・正規分布</td><td>t検定（独立2群）</td></tr>
+              <tr><td>2群・連続変数・非正規</td><td>Mann-Whitney U検定</td></tr>
+              <tr><td>3群以上・連続変数</td><td>ANOVA / Kruskal-Wallis検定</td></tr>
+              <tr><td>カテゴリ変数</td><td>χ²検定 / Fisher正確確率検定</td></tr>
+              <tr><td>前後比較・連続変数</td><td>対応のあるt検定 / Wilcoxon検定</td></tr>
+              <tr><td>関連分析</td><td>相関分析 / 回帰分析</td></tr>
+              <tr><td>時系列データ</td><td>線形混合モデル</td></tr>
+              <tr><td>QI（質改善）</td><td>ランチャート / SPC</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Auto-suggested based on Step 5 -->
+      <div class="card card-highlight" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">🤖 あなたのデータに基づく提案</h3>
+        ${Ye(s)}
+      </div>
+
+      <!-- AI-powered detailed proposal -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <button class="btn btn-primary btn-lg" id="btnAnalysis">
+          🤖 詳細な分析計画を提案してもらう
+        </button>
+      </div>
+
+      <div id="step6Results">
+        ${t.aiResult?G(t.aiResult):""}
+      </div>
+    </div>
+  `,e.querySelector("#btnAnalysis").addEventListener("click",Ve)}function Ye(e){var d,p;const t=e.grouping||"none",s=e.types||[],n=le[t]||le.none,i=s.some(u=>["vitals","labs","scales"].includes(u)),a=s.some(u=>["attributes","intervention"].includes(u)),l=s.includes("timeseries"),o=s.some(u=>["interview","observation"].includes(u)),c=[];return i&&c.push(`<li><strong>連続変数の群比較:</strong> ${((d=n.continuous)==null?void 0:d.normal)||n.continuous||"記述統計"}（正規分布を仮定）/ ${((p=n.continuous)==null?void 0:p.nonNormal)||"非パラメトリック検定"}（正規分布でない場合）</li>`),a&&c.push(`<li><strong>カテゴリ変数:</strong> ${n.categorical}</li>`),l&&c.push("<li><strong>時系列分析:</strong> 線形混合モデル（Linear Mixed Model）/ 反復測定分散分析</li>"),o&&c.push("<li><strong>質的データ:</strong> 質的内容分析 / テーマ分析 / グラウンデッドセオリー</li>"),e.sampleSize&&parseInt(e.sampleSize)<30&&c.push('<li style="color: var(--color-warning);"><strong>⚠️ 注意:</strong> サンプルサイズが30未満のため、ノンパラメトリック検定の使用を推奨します</li>'),c.length===0?'<p style="color: var(--color-text-muted);">Step 5でデータを選択すると、自動提案が表示されます。</p>':`<ul style="padding-left: var(--space-5);">${c.join("")}</ul>`}function Ve(){var a;const e=r.get("data"),s=`
+研究デザイン: ${r.get("rq.selectedDesign")||""}
+データタイプ: ${(e.types||[]).join(", ")}
+サンプルサイズ: ${e.sampleSize||"未定"}
+群分け: ${e.grouping||"未定"}
+  `.trim(),n=`${R.statisticsProposal}
+
+---
+
+${s}`;if(S()){const l=JSON.parse(k.statisticsProposal);r.set("analysis.aiResult",l),document.querySelector("#step6Results").innerHTML=G(l);const o=document.querySelector("#sumAnalysis");o&&(o.textContent=((a=l.primaryAnalysis)==null?void 0:a.method)||"提案済み",o.classList.add("active"));return}const i=document.querySelector("#step6Results");i.innerHTML=q({prompt:n,containerId:"geminiAnalysis",label:"統計分析手法の提案",expectJson:!0,placeholder:"GeminiからのJSON回答をここに貼り付けてください..."}),L(i,n,(l,o)=>{var p;let c;l?c=l:c={primaryAnalysis:{method:"提案結果",reason:o}},r.set("analysis.aiResult",c),i.innerHTML=G(c);const d=document.querySelector("#sumAnalysis");d&&(d.textContent=((p=c.primaryAnalysis)==null?void 0:p.method)||"提案済み",d.classList.add("active"))},!0)}function G(e){var t;return`
+    <div class="ai-response">
+      <div class="ai-response-header">📐 分析方法提案</div>
+      <div class="ai-response-body">
+
+        ${e.primaryAnalysis?`
+          <h4>🎯 主解析</h4>
+          <div class="card card-highlight" style="margin-bottom: var(--space-4);">
+            <h3 style="color: var(--color-primary); margin-bottom: var(--space-2);">${e.primaryAnalysis.method}</h3>
+            <div style="white-space: pre-wrap; line-height: 1.6;">${e.primaryAnalysis.reason}</div>
+          </div>
+        `:""}
+
+        ${(t=e.secondaryAnalyses)!=null&&t.length?`
+          <h4>📊 副解析の候補</h4>
+          ${e.secondaryAnalyses.map(s=>`
+            <div class="card" style="margin-bottom: var(--space-3);">
+              <strong>${s.method}</strong>
+              <div style="color: var(--color-text-secondary); margin-top: var(--space-2); white-space: pre-wrap; line-height: 1.5;">${s.reason}</div>
+            </div>
+          `).join("")}
+        `:""}
+
+        ${e.effectSize?`
+          <h4>📏 効果量</h4>
+          <p>${e.effectSize}</p>
+        `:""}
+
+        ${e.multivariateNeeded!==void 0?`
+          <h4>🔗 多変量解析</h4>
+          <p>${e.multivariateNeeded?`<span class="tag tag-warning">必要</span> ${e.multivariateMethod||""}`:'<span class="tag tag-success">不要</span>'}</p>
+        `:""}
+
+        ${e.sampleSizeNote?`
+          <h4>👥 サンプルサイズ概算</h4>
+          <div class="card card-success">
+            <div style="white-space: pre-wrap; line-height: 1.5;">${e.sampleSizeNote}</div>
+          </div>
+        `:""}
+
+      </div>
+    </div>
+  `}function Xe(){return!!r.get("analysis.aiResult")}function Ze(e){const t=r.get("proposal");e.innerHTML=`
+    <div class="fade-in">
+      <h2 class="step-title">📝 Step 7：研究計画書草案</h2>
+      <p class="step-description">
+        これまでのステップで整理した内容を統合し、ガイドライン準拠の研究計画書草案を生成します。
+      </p>
+
+      <!-- Summary of all steps -->
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <h3 class="section-title">🗂 これまでの入力内容</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+          ${et()}
+        </div>
+      </div>
+
+      <div style="margin-bottom: var(--space-6);">
+        <button class="btn btn-primary btn-lg" id="btnGenerate" style="width: 100%;">
+          📝 研究計画書草案を生成
+        </button>
+      </div>
+
+      <div id="step7Results">
+        ${t.draft?j(t.draft):""}
+      </div>
+    </div>
+  `,e.querySelector("#btnGenerate").addEventListener("click",tt),t.draft&&B(t.draft)}function et(){var l,o;const e=r.get("seed"),t=r.get("rq"),s=r.get("guideline"),n=r.get("review");r.get("data");const i=r.get("analysis"),a=e.refinedResult;return`
+    <div>
+      <p><strong>テーマ:</strong> ${a?(a.theme||a.rq||a.title||"未整理").substring(0,80):"未整理"}</p>
+      <p><strong>研究デザイン:</strong> ${t.selectedDesign||"未選択"}</p>
+      <p><strong>ガイドライン:</strong> ${s.selected||"未選択"}</p>
+    </div>
+    <div>
+      <p><strong>骨子整理:</strong> ${a?"完了":"未完了"}</p>
+      <p><strong>文献レビュー:</strong> ${n.aiResult?"実施済み":"未実施"}</p>
+      <p><strong>分析方法:</strong> ${((o=(l=i.aiResult)==null?void 0:l.primaryAnalysis)==null?void 0:o.method)||"未提案"}</p>
+    </div>
+    `}function tt(){var d,p,u,v,m,h,f,b,E,W,Y,V,X,Z,ee,te;const e=r.get("seed"),t=r.get("rq"),s=r.get("guideline"),n=r.get("review"),i=r.get("data"),a=r.get("analysis"),l=`
+以下の情報を統合して研究計画書草案を作成してください。
+
+【研究テーマ】
+${((d=e.refinedResult)==null?void 0:d.theme)||((p=e.refinedResult)==null?void 0:p.title)||""}
+
+【リサーチクエスチョン】
+${((u=e.refinedResult)==null?void 0:u.rq)||e.question||""}
+
+【研究デザイン】
+${t.selectedDesign||""}
+
+【研究の骨子】
+対象: ${((v=e.refinedResult)==null?void 0:v.target)||"未整理"}
+ゴール: ${((m=e.refinedResult)==null?void 0:m.goal)||"未整理"}
+アプローチ: ${(((h=e.refinedResult)==null?void 0:h.approaches)||[]).map(y=>`${y.name}: ${y.description}`).join(`
+`)}
+
+【準拠ガイドライン】
+${s.selected||""}
+
+【文献レビュー概要（論理構成案）】
+${((f=n.aiResult)==null?void 0:f.structure)||"未実施"}
+
+【データ収集計画】
+データタイプ: ${(i.types||[]).join(", ")}
+サンプルサイズ: ${i.sampleSize||"未定"}
+群分け: ${i.grouping||"未定"}
+
+【分析方法】
+主解析: ${((E=(b=a.aiResult)==null?void 0:b.primaryAnalysis)==null?void 0:E.method)||"未提案"}
+理由: ${((Y=(W=a.aiResult)==null?void 0:W.primaryAnalysis)==null?void 0:Y.reason)||""}
+副解析: ${(((V=a.aiResult)==null?void 0:V.secondaryAnalyses)||[]).map(y=>y.method).join(", ")}
+効果量: ${((X=a.aiResult)==null?void 0:X.effectSize)||""}
+多変量解析: ${(Z=a.aiResult)!=null&&Z.multivariateNeeded?(ee=a.aiResult)==null?void 0:ee.multivariateMethod:"不要"}
+サンプルサイズ根拠: ${((te=a.aiResult)==null?void 0:te.sampleSizeNote)||""}
+  `.trim(),o=`${R.proposalDraft}
+
+---
+
+${l}`;if(S()){const y=k.proposalDraft;r.set("proposal.draft",y),document.querySelector("#step7Results").innerHTML=j(y),B(y);return}const c=document.querySelector("#step7Results");c.innerHTML=q({prompt:o,containerId:"geminiProposal",label:"研究計画書草案の生成",expectJson:!1,placeholder:"Geminiからの研究計画書草案をここに貼り付けてください..."}),L(c,o,y=>{y&&(r.set("proposal.draft",y),c.innerHTML=j(y),B(y))})}function j(e){return`
+    <div class="ai-response">
+      <div class="ai-response-header">📝 研究計画書草案</div>
+      <div class="ai-response-body">
+        <div class="proposal-output" style="white-space: normal;">
+          ${e.replace(/^# (.+)$/gm,'<h2 style="margin-top: var(--space-6); color: var(--color-primary-dark); border-bottom: 2px solid var(--color-primary-border); padding-bottom: var(--space-2);">$1</h2>').replace(/^## (.+)$/gm,'<h3 style="margin-top: var(--space-5); color: var(--color-text);">$1</h3>').replace(/^### (.+)$/gm,'<h4 style="margin-top: var(--space-4); color: var(--color-text-secondary);">$1</h4>').replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/^- (.+)$/gm,"<li>$1</li>").replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>")}
+        </div>
+      </div>
+    </div>
+
+    <div class="export-actions" style="display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4);">
+      <button class="btn btn-success" id="btnCopyProposal">
+        📋 テキストをコピー
+      </button>
+      <button class="btn btn-primary" id="btnDownloadWord">
+        📄 Word形式でダウンロード
+      </button>
+      <button class="btn btn-outline" id="btnDownloadPDF">
+        📑 PDF形式でダウンロード
+      </button>
+    </div>
+  `}function B(e){const t=document.querySelector("#btnCopyProposal");t&&t.addEventListener("click",()=>{navigator.clipboard.writeText(e).then(()=>{t.textContent="✅ コピーしました",setTimeout(()=>{t.textContent="📋 テキストをコピー"},2e3)}).catch(()=>{const i=document.createElement("textarea");i.value=e,document.body.appendChild(i),i.select(),document.execCommand("copy"),document.body.removeChild(i),t.textContent="✅ コピーしました",setTimeout(()=>{t.textContent="📋 テキストをコピー"},2e3)})});const s=document.querySelector("#btnDownloadWord");s&&s.addEventListener("click",()=>{st(e)});const n=document.querySelector("#btnDownloadPDF");n&&n.addEventListener("click",()=>{it(e)})}function st(e){var o,c,d,p;const s=`
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: 'ＭＳ 明朝', 'Yu Mincho', serif;
+      font-size: 10.5pt;
+      line-height: 1.8;
+      margin: 2cm 2.5cm;
+    }
+    h1 {
+      font-size: 16pt;
+      text-align: center;
+      margin-bottom: 24pt;
+      border-bottom: none;
+    }
+    h2 {
+      font-size: 13pt;
+      margin-top: 18pt;
+      margin-bottom: 6pt;
+      border-bottom: 1px solid #333;
+      padding-bottom: 3pt;
+    }
+    h3 {
+      font-size: 11pt;
+      margin-top: 12pt;
+      margin-bottom: 4pt;
+    }
+    p {
+      text-indent: 1em;
+      margin: 0 0 6pt 0;
+    }
+    li {
+      margin-left: 2em;
+      margin-bottom: 3pt;
+    }
+  </style>
+</head>
+<body>
+  ${e.replace(/^# (.+)$/gm,"<h1>$1</h1>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^- (.+)$/gm,"<li>$1</li>").replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>")}
+</body>
+</html>`,n=new Blob(["\uFEFF"+s],{type:"application/msword;charset=utf-8"}),i=URL.createObjectURL(n),a=document.createElement("a"),l=(((c=(o=r.get("seed"))==null?void 0:o.refinedResult)==null?void 0:c.theme)||((p=(d=r.get("seed"))==null?void 0:d.refinedResult)==null?void 0:p.rq)||"研究計画書").substring(0,30);a.href=i,a.download=`研究計画書草案_${l}.doc`,document.body.appendChild(a),a.click(),document.body.removeChild(a),URL.revokeObjectURL(i)}function it(e){const t=e.replace(/^# (.+)$/gm,"<h1>$1</h1>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^- (.+)$/gm,"<li>$1</li>").replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>"),s=window.open("","_blank");s.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>研究計画書草案</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 2cm 2.5cm;
+    }
+    body {
+      font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'ＭＳ 明朝', serif;
+      font-size: 10.5pt;
+      line-height: 1.8;
+      color: #000;
+    }
+    h1 {
+      font-size: 16pt;
+      text-align: center;
+      margin-bottom: 24pt;
+    }
+    h2 {
+      font-size: 13pt;
+      margin-top: 18pt;
+      margin-bottom: 6pt;
+      border-bottom: 1px solid #333;
+      padding-bottom: 3pt;
+    }
+    h3 {
+      font-size: 11pt;
+      margin-top: 12pt;
+      margin-bottom: 4pt;
+    }
+    p {
+      text-indent: 1em;
+      margin: 0 0 6pt 0;
+    }
+    li {
+      margin-left: 2em;
+      margin-bottom: 3pt;
+    }
+  </style>
+</head>
+<body>
+  ${t}
+</body>
+</html>`),s.document.close(),setTimeout(()=>{s.print()},500)}function nt(){return!!r.get("proposal.draft")}const rt=[{id:1,render:Le,validate:Ae},{id:2,render:Me,validate:Ne},{id:3,render:De,validate:_e},{id:4,render:Ge,validate:Fe},{id:5,render:Ue,validate:Ke},{id:6,render:We,validate:Xe},{id:7,render:Ze,validate:nt}],at=document.getElementById("stepContent"),ot=document.getElementById("progressFill"),he=document.querySelectorAll(".step-tab"),fe=document.getElementById("btnPrev"),w=document.getElementById("btnNext"),lt=document.getElementById("stepIndicator"),T=document.getElementById("settingsModal");let g=r.get("currentStep")||1,ce=!1;function be(){ce||(ce=!0,r.hasSavedData()&&ut(),D(),P(),pt(),ct(),dt(),mt(),K())}function D(){const e=rt.find(t=>t.id===g);e&&e.render(at)}function F(e){e<1||e>7||(g=e,r.set("currentStep",g),D(),P(),window.scrollTo({top:0,behavior:"smooth"}))}function P(){const e=g/7*100;ot.style.width=`${e}%`,he.forEach(t=>{const s=parseInt(t.dataset.step);t.classList.toggle("active",s===g),t.classList.toggle("completed",r.get("completedSteps").has(s))}),fe.disabled=g===1,g===7?(w.innerHTML="✅ 完了",w.classList.remove("btn-primary"),w.classList.add("btn-success")):(w.innerHTML=`
+      確認して次へ
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    `,w.classList.remove("btn-success"),w.classList.add("btn-primary")),lt.textContent=`Step ${g} / 7`}function ct(){he.forEach(e=>{e.addEventListener("click",()=>{const t=parseInt(e.dataset.step);F(t)})})}function dt(){fe.addEventListener("click",()=>{F(g-1)}),w.addEventListener("click",()=>{const e=r.get("completedSteps");e.add(g),r.set("completedSteps",e),g<7&&F(g+1)})}function pt(){const e=document.getElementById("btnSettings"),t=document.getElementById("btnCloseSettings"),s=document.getElementById("btnSaveSettings"),n=document.getElementById("demoModeToggle");n.checked=r.get("demoMode"),e.addEventListener("click",()=>{T.classList.add("visible")}),t.addEventListener("click",()=>{T.classList.remove("visible")}),T.addEventListener("click",i=>{i.target===T&&T.classList.remove("visible")}),s.addEventListener("click",()=>{r.saveDemoMode(n.checked),T.classList.remove("visible"),s.textContent="✅ 保存しました",setTimeout(()=>{s.textContent="保存"},1500)})}function K(){var l,o,c,d,p,u;const e=r.get("seed"),t=r.get("rq"),s=r.get("guideline"),n=r.get("review"),i=r.get("data"),a=r.get("analysis");((l=e.refinedResult)!=null&&l.theme||(o=e.refinedResult)!=null&&o.title||e.question)&&$("Theme",(((c=e.refinedResult)==null?void 0:c.theme)||((d=e.refinedResult)==null?void 0:d.title)||e.question).substring(0,60)),e.refinedResult&&$("RQ",e.refinedResult.rq||e.refinedResult.title),t.selectedDesign&&$("Design",t.selectedDesign),s.selected&&$("Guideline",s.selected),n.aiResult&&$("Literature","背景構築済み"),((p=i.types)==null?void 0:p.length)>0&&$("Data",`${i.types.length}種類のデータ`),(u=a.aiResult)!=null&&u.primaryAnalysis&&$("Analysis",a.aiResult.primaryAnalysis.method)}function $(e,t){const s=document.querySelector(`#sum${e}`);s&&(s.textContent=t,s.classList.add("active"))}function ut(){const e=document.createElement("div");e.className="modal-overlay visible",e.id="resumeDialog",e.innerHTML=`
+        <div class="modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2>📂 保存データが見つかりました</h2>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="margin-bottom: var(--space-4); color: var(--color-text-secondary);">
+                    前回の作業データが保存されています。<br>続きから再開しますか？
+                </p>
+                <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="btnResume">
+                        ▶ 続きから再開
+                    </button>
+                    <button class="btn btn-outline" id="btnNewProject">
+                        🆕 新しく始める
+                    </button>
+                </div>
+            </div>
+        </div>
+    `,document.body.appendChild(e),document.getElementById("btnResume").addEventListener("click",()=>{r.loadFullState(),g=r.get("currentStep")||1,D(),P(),K(),e.remove()}),document.getElementById("btnNewProject").addEventListener("click",()=>{r.reset()})}function mt(){const e=document.getElementById("btnExport"),t=document.getElementById("btnImport"),s=document.getElementById("fileImport");e&&e.addEventListener("click",()=>{r.exportToJSON();const n=e.innerHTML;e.innerHTML="✅ 保存しました",setTimeout(()=>{e.innerHTML=n},2e3)}),t&&s&&(t.addEventListener("click",()=>{s.click()}),s.addEventListener("change",async n=>{const i=n.target.files[0];if(i){try{await r.importFromJSON(i),g=r.get("currentStep")||1,D(),P(),K();const a=t.innerHTML;t.innerHTML="✅ 読み込み完了",setTimeout(()=>{t.innerHTML=a},2e3)}catch(a){alert("ファイルの読み込みに失敗しました: "+a.message)}s.value=""}}))}document.addEventListener("DOMContentLoaded",be);document.readyState!=="loading"&&be();
