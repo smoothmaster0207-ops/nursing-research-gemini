@@ -46,9 +46,13 @@ export function renderStep1(container) {
         </button>
       </div>
 
-      <div id="geminiArea" class="hidden">
+      <div id="geminiArea">
         <div class="card">
           <h3 class="section-title">🗣 Geminiとのブレインストーミング</h3>
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-3);">
+            上のボタンを押すと、あなたの研究の種に合わせたプロンプトが生成されます。<br>
+            プロンプトをコピー → Geminiに貼り付け → Geminiの回答をここに戻す、の3ステップで進めます。
+          </p>
           <div id="geminiChatUI"></div>
         </div>
       </div>
@@ -135,7 +139,6 @@ export function renderStep1(container) {
   // Event listeners
   const textarea = container.querySelector('#seedQuestion');
   const btnStartChat = container.querySelector('#btnStartChat');
-  const geminiArea = container.querySelector('#geminiArea');
 
   // Modal logic
   const privacyModal = container.querySelector('#privacyModal');
@@ -168,9 +171,9 @@ export function renderStep1(container) {
   });
 
   btnStartChat.addEventListener('click', () => {
-    geminiArea.classList.remove('hidden');
     showGeminiPromptUI(textarea.value);
-    geminiArea.scrollIntoView({ behavior: 'smooth' });
+    const geminiArea = container.querySelector('#geminiArea');
+    if (geminiArea) geminiArea.scrollIntoView({ behavior: 'smooth' });
   });
 
   if (refinedResult) {
