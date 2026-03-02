@@ -182,6 +182,16 @@ function renderSuggestedQueries(data) {
   const area = document.querySelector('#suggestedQueriesArea');
   if (!area) return;
 
+  // 検索リンクを生成
+  const jaKeywords = (data.keywordsJa || []).join(' ');
+  const enKeywords = (data.keywordsEn || []).join(' ');
+  const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(enKeywords)}`;
+  const scholarUrl = `https://scholar.google.com/scholar?q=${encodeURIComponent(enKeywords)}`;
+  const ciniiUrl = `https://cir.nii.ac.jp/all?q=${encodeURIComponent(jaKeywords)}`;
+  const jstageUrl = `https://www.jstage.jst.go.jp/result/global/-char/ja?globalSearchKey=${encodeURIComponent(jaKeywords)}`;
+
+  const linkBtnStyle = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:0.78rem;text-decoration:none;border:1px solid;margin-top:6px;margin-right:6px;font-weight:500;';
+
   area.style.display = 'block';
   area.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); background: var(--color-primary-bg); padding: var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-primary-border);">
@@ -196,6 +206,11 @@ function renderSuggestedQueries(data) {
           <span style="font-size: 0.8rem; color: var(--color-text-muted);">検索式（コピーして使えます）:</span>
           <textarea readonly class="input" style="font-family: monospace; font-size: 0.8rem; padding: var(--space-2); min-height: 60px; background: var(--color-bg); margin-top: var(--space-1); resize: none;" onclick="this.select()">${data.queryJa || ''}</textarea>
         </div>
+        <div style="margin-top: var(--space-2);">
+          <span style="font-size: 0.75rem; color: var(--color-text-muted);">直接検索:</span><br>
+          <a href="${ciniiUrl}" target="_blank" rel="noopener" style="${linkBtnStyle}color:#1a73e8;border-color:#1a73e8;background:#e8f0fe;">📚 CiNii Research</a>
+          <a href="${jstageUrl}" target="_blank" rel="noopener" style="${linkBtnStyle}color:#2e7d32;border-color:#2e7d32;background:#e8f5e9;">📄 J-STAGE</a>
+        </div>
       </div>
       
       <!-- 英語 -->
@@ -208,6 +223,11 @@ function renderSuggestedQueries(data) {
         <div>
           <span style="font-size: 0.8rem; color: var(--color-text-muted);">検索式（コピーして使えます）:</span>
           <textarea readonly class="input" style="font-family: monospace; font-size: 0.8rem; padding: var(--space-2); min-height: 60px; background: var(--color-bg); margin-top: var(--space-1); resize: none;" onclick="this.select()">${data.queryEn || ''}</textarea>
+        </div>
+        <div style="margin-top: var(--space-2);">
+          <span style="font-size: 0.75rem; color: var(--color-text-muted);">直接検索:</span><br>
+          <a href="${pubmedUrl}" target="_blank" rel="noopener" style="${linkBtnStyle}color:#1565c0;border-color:#1565c0;background:#e3f2fd;">🔬 PubMed</a>
+          <a href="${scholarUrl}" target="_blank" rel="noopener" style="${linkBtnStyle}color:#4285f4;border-color:#4285f4;background:#e8f0fe;">🎓 Google Scholar</a>
         </div>
       </div>
     </div>
@@ -332,6 +352,9 @@ export function validateStep4() {
 }
 
 function parseTextKeywords(text) {
+  // プリプロセス: 太字マークダウン除去、リスト記号除去
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^[-•]\s*/gm, '').replace(/^\d+\.\s*/gm, '');
+
   const result = {
     keywordsJa: [],
     keywordsEn: [],

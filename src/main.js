@@ -69,13 +69,69 @@ function renderCurrentStep() {
     }
 }
 
+// ステップ依存関係: 各ステップが変更されたら、どの下流ステップの再生成を推奨するか
+const STEP_DEPENDENCIES = {
+    1: { label: '種と整理', affects: [2, 4, 6, 7], dataKeys: ['seed.refinedResult'] },
+    2: { label: 'デザイン案', affects: [3, 4, 6, 7], dataKeys: ['rq.selectedDesign', 'rq.aiResults'] },
+    3: { label: 'ガイドライン', affects: [4, 7], dataKeys: ['guideline.selected'] },
+    4: { label: '文献レビュー', affects: [7], dataKeys: ['review.aiResult'] },
+    5: { label: 'データ収集', affects: [6, 7], dataKeys: ['data.types', 'data.sampleSize'] },
+    6: { label: '分析方法', affects: [7], dataKeys: ['analysis.aiResult'] },
+};
+
+const STEP_NAMES = {
+    1: '種と整理', 2: 'デザイン案', 3: 'ガイドライン', 4: '文献レビュー',
+    5: 'データ収集', 6: '分析方法', 7: '計画書草案',
+};
+
 function goToStep(stepNum) {
     if (stepNum < 1 || stepNum > 7) return;
+
+    // 後戻り検知: 戻った先のステップより後に既存データがある場合、警告を表示
+    if (stepNum < currentStep) {
+        const dep = STEP_DEPENDENCIES[stepNum];
+        if (dep) {
+            const affectedWithData = dep.affects.filter(s => {
+                if (s === 2) return !!state.get('rq.aiResults');
+                if (s === 3) return !!state.get('guideline.selected');
+                if (s === 4) return !!state.get('review.aiResult');
+                if (s === 6) return !!state.get('analysis.aiResult');
+                if (s === 7) return !!state.get('proposal.draft');
+                return false;
+            });
+
+            if (affectedWithData.length > 0) {
+                showStaleDataWarning(stepNum, affectedWithData);
+            }
+        }
+    }
+
     currentStep = stepNum;
     state.set('currentStep', currentStep);
     renderCurrentStep();
     updateNavigation();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showStaleDataWarning(changedStep, affectedSteps) {
+    const names = affectedSteps.map(s => `Step ${s}（${STEP_NAMES[s]}）`).join('、');
+    const existing = document.getElementById('staleDataWarning');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'staleDataWarning';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#fff3cd,#ffeeba);border-bottom:2px solid #f0c36d;padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+    banner.innerHTML = `
+      <span style="font-size:1.3rem;">🔄</span>
+      <div style="flex:1;color:#856404;font-size:0.9rem;">
+        <strong>Step ${changedStep}（${STEP_NAMES[changedStep]}）を修正すると、${names} の内容が古くなる可能性があります。</strong><br>
+        修正後は該当ステップでAI提案の再生成をお勧めします。
+      </div>
+      <button onclick="this.parentElement.remove()" style="background:none;border:1px solid #856404;color:#856404;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">OK</button>
+    `;
+    document.body.prepend(banner);
+    // 10秒後に自動で消す
+    setTimeout(() => { if (banner.parentElement) banner.remove(); }, 10000);
 }
 
 // ===========================

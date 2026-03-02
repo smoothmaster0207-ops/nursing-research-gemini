@@ -176,6 +176,9 @@ function normalizeProposal(data) {
 }
 
 function parseTextDesign(raw) {
+  // プリプロセス: 太字マークダウン除去、リスト記号除去
+  raw = raw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^[-•]\s*/gm, '').replace(/^\d+\.\s*/gm, '');
+
   const result = {
     design: '',
     vision: '',

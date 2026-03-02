@@ -187,6 +187,9 @@ function runAnalysis() {
 }
 
 function parseTextAnalysis(text) {
+  // プリプロセス: 太字マークダウン除去、リスト記号除去
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^[-•]\s*/gm, '').replace(/^\d+\.\s*/gm, '');
+
   const result = {
     primaryAnalysis: { method: '', reason: '' },
     secondaryAnalyses: [],
