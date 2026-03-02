@@ -93,41 +93,61 @@ function generateProposal() {
     }
   }
 
+  // --- 情報の優先度付けと要約 ---
+
+  // 文献レビュー構成案が長すぎる場合は省略（Geminiのコンテキスト過負荷防止）
+  let litStructure = review.aiResult?.structure || '';
+  if (litStructure.length > 600) {
+    litStructure = litStructure.substring(0, 600) + '\n…（以下省略。全体の骨格は上記を参考に執筆してください）';
+  }
+
+  // 分析方法の要点のみ
+  const analysisMethod = analysis.aiResult?.primaryAnalysis?.method || '未提案';
+  const analysisReason = (analysis.aiResult?.primaryAnalysis?.reason || '').substring(0, 200);
+  const secondaryMethods = (analysis.aiResult?.secondaryAnalyses || []).map(s => s.method).filter(Boolean).join(', ');
+
   const userMsg = `
 以下の情報を統合して研究計画書草案を作成してください。
+情報は優先度順に整理されています。【コア情報】を最も重視し、【詳細情報】で肉付けしてください。
+
+━━━ コア情報（最重要）━━━
 
 【研究テーマ】
-${seed.refinedResult?.theme || seed.refinedResult?.title || ''}
+${seed.refinedResult?.theme || seed.refinedResult?.title || '未設定'}
 
 【リサーチクエスチョン】
-${seed.refinedResult?.rq || seed.question || ''}
+${seed.refinedResult?.rq || seed.question || '未設定'}
 
 【研究デザイン】
-${rq.selectedDesign || ''}
+${rq.selectedDesign || '未選択'}
 
 【研究の骨子】
 対象: ${seed.refinedResult?.target || '未整理'}
 ゴール: ${seed.refinedResult?.goal || '未整理'}
-アプローチ: ${(seed.refinedResult?.approaches || []).map(a => `${a.name}: ${a.description}`).join('\n')}
+アプローチ: ${(seed.refinedResult?.approaches || []).map(a => `${a.name}: ${a.description}`).join('\n') || 'なし'}
+
+━━━ 詳細情報 ━━━
 
 【準拠ガイドライン】
-${guidelineName}${checklistSection}
-
-【文献レビュー概要（論理構成案）】
-${review.aiResult?.structure || '未実施'}
+${guidelineName || '未選択'}${checklistSection}
 
 【データ収集計画】
-データタイプ: ${(data.types || []).join(', ')}
+データタイプ: ${(data.types || []).join(', ') || '未定'}
 サンプルサイズ: ${data.sampleSize || '未定'}
 群分け: ${data.grouping || '未定'}
 
 【分析方法】
-主解析: ${analysis.aiResult?.primaryAnalysis?.method || '未提案'}
-理由: ${analysis.aiResult?.primaryAnalysis?.reason || ''}
-副解析: ${(analysis.aiResult?.secondaryAnalyses || []).map(s => s.method).join(', ')}
-効果量: ${analysis.aiResult?.effectSize || ''}
+主解析: ${analysisMethod}
+理由: ${analysisReason}
+${secondaryMethods ? `副解析: ${secondaryMethods}` : ''}
+効果量: ${analysis.aiResult?.effectSize || '未決定'}
 多変量解析: ${analysis.aiResult?.multivariateNeeded ? analysis.aiResult?.multivariateMethod : '不要'}
-サンプルサイズ根拠: ${analysis.aiResult?.sampleSizeNote || ''}
+サンプルサイズ根拠: ${analysis.aiResult?.sampleSizeNote || '未算出'}
+
+━━━ 補足情報 ━━━
+
+【文献レビュー概要（論理構成案）】
+${litStructure || '未実施'}
   `.trim();
 
   const fullPrompt = `${PROMPTS.proposalDraft}\n\n---\n\n${userMsg}`;

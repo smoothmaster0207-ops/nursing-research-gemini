@@ -288,6 +288,22 @@ function renderAnalysisResults(data) {
           </div>
         ` : ''}
 
+        <div style="margin-top: var(--space-5); background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: 1px solid #90caf9; border-radius: var(--radius-md); padding: var(--space-4);">
+          <div style="display: flex; gap: var(--space-3); align-items: flex-start;">
+            <div style="font-size: 1.3rem; line-height: 1;">📋</div>
+            <div>
+              <p style="font-weight: bold; color: #1565c0; margin-bottom: var(--space-2); font-size: 0.95rem;">統計手法の妥当性チェックリスト</p>
+              <ul style="color: #1565c0; font-size: var(--font-size-sm); line-height: 1.8; padding-left: var(--space-5); margin: 0;">
+                <li>提案された分析手法が<strong>研究デザイン・データの種類（連続/カテゴリカル）と整合しているか</strong>確認する</li>
+                <li>データの分布（正規分布の仮定）を事前に検討し、<strong>ノンパラメトリック検定の必要性</strong>を判断する</li>
+                <li>サンプルサイズは<strong>G*Power等で自身の設定値（α, β, 効果量）を用いて再計算</strong>する</li>
+                <li>交絡因子の調整が適切に<strong>多変量モデルに反映されているか</strong>確認する</li>
+                <li>可能であれば<strong>統計の専門家（生物統計家）にレビュー</strong>を依頼する</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   `;
