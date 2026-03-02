@@ -5,6 +5,7 @@
 import { state } from '../state.js';
 import { PROMPTS, DEMO_RESPONSES } from '../prompts/index.js';
 import { renderGeminiUI, attachGeminiListeners, isDemoMode } from '../gemini-helper.js';
+import { CHECKLIST_ITEMS } from './step3-guideline.js';
 
 export function renderStep7(container) {
   const proposal = state.get('proposal');
@@ -74,6 +75,24 @@ function generateProposal() {
   const data = state.get('data');
   const analysis = state.get('analysis');
 
+  // チェックリストのメモ情報を収集
+  const guidelineName = guideline.selected || '';
+  const notes = guideline.notes || {};
+  const guidelineItems = CHECKLIST_ITEMS[guidelineName] || [];
+  let checklistSection = '';
+  if (guidelineItems.length > 0) {
+    const entries = [];
+    guidelineItems.forEach((item, i) => {
+      const note = notes[i];
+      if (note && note.trim()) {
+        entries.push(`  ✓ ${item}: ${note.trim()}`);
+      }
+    });
+    if (entries.length > 0) {
+      checklistSection = `\n\n【ガイドライン（${guidelineName}）チェックリストに基づくユーザーのメモ・方針】\n※ 以下はユーザーがStep 3で入力した研究の方針や検討内容です。計画書作成時にこれらの内容を積極的に反映してください。\n${entries.join('\n')}`;
+    }
+  }
+
   const userMsg = `
 以下の情報を統合して研究計画書草案を作成してください。
 
@@ -92,7 +111,7 @@ ${rq.selectedDesign || ''}
 アプローチ: ${(seed.refinedResult?.approaches || []).map(a => `${a.name}: ${a.description}`).join('\n')}
 
 【準拠ガイドライン】
-${guideline.selected || ''}
+${guidelineName}${checklistSection}
 
 【文献レビュー概要（論理構成案）】
 ${review.aiResult?.structure || '未実施'}
