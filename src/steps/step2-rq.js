@@ -120,14 +120,30 @@ function generateDesign(requestAlternative = false) {
       prompt: fullPrompt,
       containerId: 'geminiDesign',
       label: '研究デザイン提案',
-      expectJson: true,
-      placeholder: 'GeminiからのJSON回答をここに貼り付けてください...',
+      expectJson: false,
+      placeholder: 'Geminiが出力した「📋 研究デザイン提案」をここにコピー＆ペーストしてください...',
     });
 
-    attachGeminiListeners(area, fullPrompt, (parsed, raw) => {
-      if (parsed) {
-        const proposal = normalizeProposal(parsed);
+    attachGeminiListeners(area, fullPrompt, (response, raw) => {
+      const rawText = raw || response || '';
 
+      // 1. まずJSON形式を試行
+      let proposal = null;
+      try {
+        const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const jsonMatch = cleaned.match(/\{[\s\S]*"design"\s*:[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          proposal = normalizeProposal(parsed);
+        }
+      } catch (_) { /* skip */ }
+
+      // 2. JSONが失敗したらテキスト形式からパース
+      if (!proposal) {
+        proposal = parseTextDesign(rawText);
+      }
+
+      if (proposal) {
         if (requestAlternative && currentProposal) {
           const updatedHistory = [...history, currentProposal];
           state.set('rq.proposalHistory', updatedHistory);
@@ -140,25 +156,9 @@ function generateDesign(requestAlternative = false) {
         area.innerHTML = renderProposal(proposal, null, newHistory);
         attachListeners(area);
       } else {
-        // JSONパース失敗 - テキストから解析を試みる
-        const fallbackProposal = parseTextResponse(raw);
-        if (fallbackProposal) {
-          if (requestAlternative && currentProposal) {
-            const updatedHistory = [...history, currentProposal];
-            state.set('rq.proposalHistory', updatedHistory);
-          }
-
-          state.set('rq.aiResults', fallbackProposal);
-          state.set('rq.selectedDesign', null);
-
-          const newHistory = state.get('rq.proposalHistory') || [];
-          area.innerHTML = renderProposal(fallbackProposal, null, newHistory);
-          attachListeners(area);
-        } else {
-          alert('JSON形式の回答を貼り付けてください。Geminiの回答から { から始まる部分をコピーしてください。');
-        }
+        alert('提案内容を判読できませんでした。Geminiが出力した「📋 研究デザイン提案」の部分をそのまま貼り付けてください。');
       }
-    }, true);
+    });
   }
 }
 
@@ -175,29 +175,45 @@ function normalizeProposal(data) {
   };
 }
 
-function parseTextResponse(raw) {
-  // テキストレスポンスからJSON抽出を試みる
-  try {
-    const cleaned = raw
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-
-    // JSON部分を探す
-    const jsonMatch = cleaned.match(/\{[\s\S]*"design"\s*:[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return normalizeProposal(parsed);
-    }
-  } catch (_) { /* skip */ }
-
-  // フォールバック
-  return {
-    design: 'AIからの提案',
-    vision: raw.substring(0, 800),
+function parseTextDesign(raw) {
+  const result = {
+    design: '',
+    vision: '',
     finer: {},
-    reason: '（JSONの解析に失敗したため、テキストとして表示しています。）'
+    reason: '',
   };
+
+  // 推奨デザインを探す
+  const designMatch = raw.match(/推奨デザイン\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (designMatch) result.design = designMatch[1].trim();
+
+  // ビジョンを探す
+  const visionMatch = raw.match(/研究のビジョン\s*[:：]\s*([\s\S]*?)(?=(?:FINER|推奨理由|---|$))/);
+  if (visionMatch) result.vision = visionMatch[1].trim();
+
+  // FINER評価を探す
+  const fMatch = raw.match(/実現可能性[（(]?F[)）]?\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (fMatch) result.finer.f = fMatch[1].trim();
+  const iMatch = raw.match(/面白さ[（(]?I[)）]?\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (iMatch) result.finer.i = iMatch[1].trim();
+  const nMatch = raw.match(/新規性[（(]?N[)）]?\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (nMatch) result.finer.n = nMatch[1].trim();
+  const eMatch = raw.match(/倫理性[（(]?E[)）]?\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (eMatch) result.finer.e = eMatch[1].trim();
+  const rMatch = raw.match(/関連性[（(]?R[)）]?\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (rMatch) result.finer.r = rMatch[1].trim();
+
+  // 推奨理由を探す
+  const reasonMatch = raw.match(/推奨理由\s*[:：]\s*([\s\S]*?)(?=(?:---|✅|📌|$))/);
+  if (reasonMatch) result.reason = reasonMatch[1].trim();
+
+  // デザイン名がなくても内容があれば採用
+  if (!result.design && raw.trim().length > 30) {
+    result.design = raw.trim().split('\n')[0].substring(0, 100);
+  }
+
+  if (result.design) return result;
+  return null;
 }
 
 /**
