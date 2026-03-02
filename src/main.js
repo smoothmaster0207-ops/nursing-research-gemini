@@ -10,9 +10,10 @@ import { renderStep3, validateStep3 } from './steps/step3-guideline.js';
 import { renderStep4, validateStep4 } from './steps/step4-review.js';
 import { renderStep5, validateStep5 } from './steps/step5-data.js';
 import { renderStep6, validateStep6 } from './steps/step6-analysis.js';
-import { renderStep7, validateStep7 } from './steps/step7-proposal.js';
+import { renderStep7Audit, validateStep7Audit } from './steps/step6-5-audit.js';
+import { renderStep7 as renderStep8, validateStep7 as validateStep8 } from './steps/step7-proposal.js';
 
-// Step definitions
+// Step definitions (8 steps: 1-6 + 7:Audit + 8:Proposal)
 const STEPS = [
     { id: 1, render: renderStep1, validate: validateStep1 },
     { id: 2, render: renderStep2, validate: validateStep2 },
@@ -20,7 +21,8 @@ const STEPS = [
     { id: 4, render: renderStep4, validate: validateStep4 },
     { id: 5, render: renderStep5, validate: validateStep5 },
     { id: 6, render: renderStep6, validate: validateStep6 },
-    { id: 7, render: renderStep7, validate: validateStep7 },
+    { id: 7, render: renderStep7Audit, validate: validateStep7Audit },
+    { id: 8, render: renderStep8, validate: validateStep8 },
 ];
 
 // DOM Elements
@@ -71,21 +73,22 @@ function renderCurrentStep() {
 
 // ステップ依存関係: 各ステップが変更されたら、どの下流ステップの再生成を推奨するか
 const STEP_DEPENDENCIES = {
-    1: { label: '種と整理', affects: [2, 4, 6, 7], dataKeys: ['seed.refinedResult'] },
-    2: { label: 'デザイン案', affects: [3, 4, 6, 7], dataKeys: ['rq.selectedDesign', 'rq.aiResults'] },
-    3: { label: 'ガイドライン', affects: [4, 7], dataKeys: ['guideline.selected'] },
-    4: { label: '文献レビュー', affects: [7], dataKeys: ['review.aiResult'] },
-    5: { label: 'データ収集', affects: [6, 7], dataKeys: ['data.types', 'data.sampleSize'] },
-    6: { label: '分析方法', affects: [7], dataKeys: ['analysis.aiResult'] },
+    1: { label: '種と整理', affects: [2, 4, 6, 7, 8], dataKeys: ['seed.refinedResult'] },
+    2: { label: 'デザイン案', affects: [3, 4, 6, 7, 8], dataKeys: ['rq.selectedDesign', 'rq.aiResults'] },
+    3: { label: 'ガイドライン', affects: [4, 8], dataKeys: ['guideline.selected'] },
+    4: { label: '文献レビュー', affects: [8], dataKeys: ['review.aiResult'] },
+    5: { label: 'データ収集', affects: [6, 7, 8], dataKeys: ['data.types', 'data.sampleSize'] },
+    6: { label: '分析方法', affects: [7, 8], dataKeys: ['analysis.aiResult'] },
+    7: { label: '整合性チェック', affects: [8], dataKeys: ['audit.result'] },
 };
 
 const STEP_NAMES = {
     1: '種と整理', 2: 'デザイン案', 3: 'ガイドライン', 4: '文献レビュー',
-    5: 'データ収集', 6: '分析方法', 7: '計画書草案',
+    5: 'データ収集', 6: '分析方法', 7: '整合性チェック', 8: '計画書草案',
 };
 
 function goToStep(stepNum) {
-    if (stepNum < 1 || stepNum > 7) return;
+    if (stepNum < 1 || stepNum > 8) return;
 
     // 後戻り検知: 戻った先のステップより後に既存データがある場合、警告を表示
     if (stepNum < currentStep) {
@@ -96,7 +99,8 @@ function goToStep(stepNum) {
                 if (s === 3) return !!state.get('guideline.selected');
                 if (s === 4) return !!state.get('review.aiResult');
                 if (s === 6) return !!state.get('analysis.aiResult');
-                if (s === 7) return !!state.get('proposal.draft');
+                if (s === 7) return !!state.get('audit.result');
+                if (s === 8) return !!state.get('proposal.draft');
                 return false;
             });
 
@@ -140,7 +144,7 @@ function showStaleDataWarning(changedStep, affectedSteps) {
 
 function updateNavigation() {
     // Progress bar
-    const pct = (currentStep / 7) * 100;
+    const pct = (currentStep / 8) * 100;
     progressFill.style.width = `${pct}%`;
 
     // Tab states
@@ -153,7 +157,7 @@ function updateNavigation() {
     // Prev/Next buttons
     btnPrev.disabled = currentStep === 1;
 
-    if (currentStep === 7) {
+    if (currentStep === 8) {
         btnNext.innerHTML = '✅ 完了';
         btnNext.classList.remove('btn-primary');
         btnNext.classList.add('btn-success');
@@ -167,7 +171,7 @@ function updateNavigation() {
     }
 
     // Step indicator
-    stepIndicator.textContent = `Step ${currentStep} / 7`;
+    stepIndicator.textContent = `Step ${currentStep} / 8`;
 }
 
 function initTabListeners() {
@@ -190,7 +194,7 @@ function initNavListeners() {
         completedSteps.add(currentStep);
         state.set('completedSteps', completedSteps);
 
-        if (currentStep < 7) {
+        if (currentStep < 8) {
             goToStep(currentStep + 1);
         }
     });
