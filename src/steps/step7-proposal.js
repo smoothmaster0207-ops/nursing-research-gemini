@@ -159,9 +159,43 @@ ${review.aiResult?.structure || '未実施'}
   });
 }
 
+function addReviewMarkers(html) {
+  const ms = 'display:inline-block;background:#fff3cd;color:#856404;font-size:0.7rem;padding:1px 6px;border-radius:3px;margin-left:4px;font-weight:bold;vertical-align:middle;border:1px solid #f0c36d;';
+  const tags = {
+    lit: `<span style="${ms}" title="文献を自身で検索し、実在を確認してください">⚠️文献要確認</span>`,
+    stat: `<span style="${ms}" title="統計の専門家に妥当性を確認してください">⚠️統計要確認</span>`,
+    sample: `<span style="${ms}" title="サンプルサイズの計算根拠を自身で検証してください">⚠️要検証</span>`,
+    ethics: `<span style="${ms}" title="施設の倫理審査要件に合わせて修正してください">⚠️施設に合わせて修正</span>`,
+    citation: `<span style="${ms}background:#f8d7da;color:#721c24;border-color:#f5c6cb;" title="実在する文献に差し替えてください">🔴出典未確認</span>`,
+  };
+  let count = 0;
+  const mark = (t) => { count++; return t; };
+
+  // 「出典確認中」
+  html = html.replace(/出典確認中/g, () => mark(`出典確認中 ${tags.citation}`));
+
+  // 文献言及パターン
+  html = html.replace(/(先行研究によ(?:れば|ると))/g, (m) => mark(`${m} ${tags.lit}`));
+  html = html.replace(/(既存の(?:エビデンス|研究|知見)(?:では|によ(?:れば|ると)))/g, (m) => mark(`${m} ${tags.lit}`));
+  html = html.replace(/((?:国内外の|複数の|多くの|近年の)(?:研究|報告|調査)(?:では|で|が|において))/g, (m) => mark(`${m} ${tags.lit}`));
+  html = html.replace(/((?:メタアナリシス|システマティックレビュー)(?:では|によ(?:れば|ると)))/g, (m) => mark(`${m} ${tags.lit}`));
+
+  // 統計手法
+  html = html.replace(/(t検定|χ²検定|カイ二乗検定|Mann-Whitney|Wilcoxon|ANOVA|分散分析|ロジスティック回帰|Cox比例ハザード|Kaplan-Meier|ログランク検定|線形混合モデル|共分散分析|因子分析|主成分分析|構造方程式)/g, (m) => mark(`${m} ${tags.stat}`));
+
+  // サンプルサイズ
+  html = html.replace(/((?:サンプルサイズ|標本サイズ|症例数)(?:は|を|の)[^<]{5,60}?(?:名|例|人|とする|と設定|を目標))/g, (m) => mark(`${m} ${tags.sample}`));
+
+  // 倫理関連
+  html = html.replace(/(インフォームド・コンセント)/g, (m) => mark(`${m} ${tags.ethics}`));
+  html = html.replace(/(倫理審査委員会(?:の承認|に申請|の審査))/g, (m) => mark(`${m} ${tags.ethics}`));
+
+  return { html, count, tags };
+}
+
 function renderProposal(draft) {
   // Convert markdown-like formatting to HTML
-  const htmlContent = draft
+  let htmlContent = draft
     .replace(/^# (.+)$/gm, '<h2 style="margin-top: var(--space-6); color: var(--color-primary-dark); border-bottom: 2px solid var(--color-primary-border); padding-bottom: var(--space-2);">$1</h2>')
     .replace(/^## (.+)$/gm, '<h3 style="margin-top: var(--space-5); color: var(--color-text);">$1</h3>')
     .replace(/^### (.+)$/gm, '<h4 style="margin-top: var(--space-4); color: var(--color-text-secondary);">$1</h4>')
@@ -170,10 +204,32 @@ function renderProposal(draft) {
     .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br>');
 
+  // 要確認マーカーを自動挿入
+  const { html: markedHtml, count, tags } = addReviewMarkers(htmlContent);
+  htmlContent = markedHtml;
+
+  const legend = count > 0 ? `
+    <div style="background: var(--color-bg-secondary, #f8f9fa); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+      <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3);">
+        <span style="font-size: 1.2rem;">🔍</span>
+        <strong style="font-size: 0.95rem;">要確認箇所: ${count}件を自動検出しました</strong>
+      </div>
+      <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-3);">計画書内の以下のマーカーが付いた箇所は、提出前に必ずご自身で確認・修正してください。</p>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-4); font-size: var(--font-size-sm);">
+        <span>${tags.citation} 出典未確認→実在文献に差替え</span>
+        <span>${tags.lit} 文献参照→自身で検索・確認</span>
+        <span>${tags.stat} 統計手法→専門家に確認</span>
+        <span>${tags.sample} サンプルサイズ→根拠を検証</span>
+        <span>${tags.ethics} 倫理関連→施設に合わせて修正</span>
+      </div>
+    </div>
+  ` : '';
+
   return `
     <div class="ai-response">
       <div class="ai-response-header">📝 研究計画書草案</div>
       <div class="ai-response-body">
+        ${legend}
         <div class="proposal-output" style="white-space: normal;">
           ${htmlContent}
         </div>
