@@ -1,5 +1,5 @@
 /**
- * step1-seed.js — 種と整理 (Initial Seed + Chat) — Gemini連携版
+ * step1-seed.js — 種と整理 (Initial Seed + Gemini連携) — Gemini連携版
  */
 
 import { state } from '../state.js';
@@ -8,7 +8,6 @@ import { renderGeminiUI, attachGeminiListeners, isDemoMode } from '../gemini-hel
 
 export function renderStep1(container) {
   const seed = state.get('seed');
-  const chatHistory = seed.chatHistory || [];
   const refinedResult = seed.refinedResult || null;
 
   container.innerHTML = `
@@ -43,31 +42,19 @@ export function renderStep1(container) {
         </div>
 
         <button class="btn btn-primary btn-lg" id="btnStartChat" ${!seed.question ? 'disabled' : ''}>
-          🤖 アドバイザーと対話を始める
+          🤖 Geminiでブレインストーミングを始める
         </button>
       </div>
 
-      <div id="chatArea" class="${chatHistory.length > 0 ? '' : 'hidden'}">
-        <div class="card expert-chat-card">
-          <h3 class="section-title">🗣 壁打ち（Brainstorming）</h3>
-          
+      <div id="geminiArea" class="hidden">
+        <div class="card">
+          <h3 class="section-title">🗣 Geminiとのブレインストーミング</h3>
           <div id="geminiChatUI"></div>
-
-          <div class="chat-container" id="chatContainer">
-            ${chatHistory.map(msg => renderChatMessage(msg)).join('')}
-          </div>
-
-          <div class="chat-input-area" id="chatInputArea">
-            <textarea class="textarea" id="chatInput" placeholder="回答を入力してください..." rows="3"></textarea>
-            <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
-              <button class="btn btn-primary" id="btnSend">送信</button>
-            </div>
-          </div>
         </div>
+      </div>
 
-        <div id="refinedResultArea" class="${refinedResult ? '' : 'hidden'}">
-          ${refinedResult ? renderRefinedResult(refinedResult) : ''}
-        </div>
+      <div id="refinedResultArea" class="${refinedResult ? '' : 'hidden'}">
+        ${refinedResult ? renderRefinedResult(refinedResult) : ''}
       </div>
     </div>
 
@@ -148,9 +135,7 @@ export function renderStep1(container) {
   // Event listeners
   const textarea = container.querySelector('#seedQuestion');
   const btnStartChat = container.querySelector('#btnStartChat');
-  const chatArea = container.querySelector('#chatArea');
-  const input = container.querySelector('#chatInput');
-  const btnSend = container.querySelector('#btnSend');
+  const geminiArea = container.querySelector('#geminiArea');
 
   // Modal logic
   const privacyModal = container.querySelector('#privacyModal');
@@ -182,209 +167,106 @@ export function renderStep1(container) {
     btnStartChat.disabled = !textarea.value.trim();
   });
 
-  btnStartChat.addEventListener('click', async () => {
-    chatArea.classList.remove('hidden');
-    if ((state.get('seed.chatHistory') || []).length === 0) {
-      await startChat(textarea.value);
-    }
-    textarea.closest('.card').scrollIntoView({ behavior: 'smooth' });
-  });
-
-  const handleSend = () => {
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    input.style.height = 'auto';
-    handleUserMessage(text);
-  };
-
-  btnSend.addEventListener('click', handleSend);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.stopPropagation();
-    }
-  });
-
-  input.addEventListener('input', () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+  btnStartChat.addEventListener('click', () => {
+    geminiArea.classList.remove('hidden');
+    showGeminiPromptUI(textarea.value);
+    geminiArea.scrollIntoView({ behavior: 'smooth' });
   });
 
   if (refinedResult) {
     const area = container.querySelector('#refinedResultArea');
     attachRefinedResultListeners(area, refinedResult);
+    // 右サイドバーにも反映
+    updateSummary('Theme', (refinedResult.theme || refinedResult.rq || '').substring(0, 60));
+    updateSummary('RQ', refinedResult.rq || '');
   }
 }
 
-function renderChatMessage(msg) {
-  return `
-    <div class="chat-message ${msg.role}">
-      <div class="chat-avatar">${msg.role === 'ai' ? '🤖' : '👤'}</div>
-      <div class="chat-bubble">${msg.content.replace(/\n/g, '<br>')}</div>
-    </div>
-  `;
-}
+function showGeminiPromptUI(question) {
+  const prompt = `${PROMPTS.rqAssistant}\n\n---\n\n【ユーザーからの研究の種】\n${question}`;
 
-async function startChat(question) {
-  if (isDemoMode()) {
-    const initialMsg = {
-      role: 'ai',
-      content: `素敵な研究の種ですね！「${question}」は、看護実践の質に直結する大切なテーマだと思います。\n\nもう少し研究を具体化していくために、いくつか教えていただけますか？すべてに答える必要はありません。書きやすいものだけで大丈夫です。\n\n- **研究対象**: どのような患者さん・場面を想定していますか？\n- **研究目的**: 最終的に何を明らかにしたい、もしくは改善したいですか？\n- **背景**: すでに分かっていること、まだ明らかでないことは？\n- **今の悩み**: テーマが広すぎる、方法が分からない、など困っていることは？\n\nお気軽にお聞かせください。一緒に整理していきましょう！`,
-    };
-    addMessage(initialMsg);
-  } else {
-    // Gemini連携: プロンプトを生成してUI表示
-    showGeminiChatUI(question);
-  }
-}
-
-function showGeminiChatUI(question) {
-  const history = state.get('seed.chatHistory') || [];
-
-  let prompt;
-  if (history.length === 0) {
-    // 初回: システムプロンプト + ユーザーの研究の種
-    prompt = `${PROMPTS.rqAssistant}\n\n---\n\n【ユーザーからの研究の種】\n${question}`;
-  } else {
-    // 会話の続き: これまでのやり取り + 新しいメッセージ
-    const conversationHistory = history.map(m =>
-      `${m.role === 'ai' ? 'アシスタント' : 'ユーザー'}: ${m.content}`
-    ).join('\n\n');
-    prompt = `${PROMPTS.rqAssistant}\n\n---\n\n【これまでの対話】\n${conversationHistory}\n\n---\n\n上記の対話に続けて、アシスタントとして次の返答をしてください。`;
-  }
-
-  const geminiUIContainer = document.querySelector('#geminiChatUI');
-  if (geminiUIContainer) {
-    geminiUIContainer.innerHTML = renderGeminiUI({
-      prompt: prompt,
-      containerId: 'geminiChat',
-      label: 'ブレインストーミング',
-      expectJson: false,
-      placeholder: 'Geminiからの回答をここに貼り付けてください...',
-    });
-
-    attachGeminiListeners(geminiUIContainer, prompt, (response) => {
-      if (response) {
-        addMessage({ role: 'ai', content: response });
-        // UI をクリアして次のやり取りに備える
-        geminiUIContainer.innerHTML = '';
-
-        // 十分な対話が行われたら骨子生成を促す
-        const chatHistory = state.get('seed.chatHistory') || [];
-        if (chatHistory.length >= 6 && !state.get('seed.refinedResult')) {
-          showRefineUI();
-        }
-      }
-    });
-  }
-}
-
-function handleUserMessage(text) {
-  addMessage({ role: 'user', content: text });
-
-  if (isDemoMode()) {
-    handleDemoMessage(text);
-  } else {
-    // Gemini連携: 新しいプロンプトを生成して表示
-    showGeminiChatUI(state.get('seed.question'));
-  }
-}
-
-async function handleDemoMessage(text) {
-  const chatHistory = state.get('seed.chatHistory') || [];
-  const userMsgCount = chatHistory.filter(m => m.role === 'user').length;
-
-  await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-
-  let response;
-  if (userMsgCount <= 1) {
-    response = `ありがとうございます！とても具体的なイメージが湧いてきました。\n\n65歳以上の急性期病棟の患者さんを対象に、多職種連携の退院支援の効果を検証するという方向ですね。\n\nもう少し教えてください：\n- **介入の具体的な内容**: 現在の退院支援と比べて、どんな「新しい取り組み」を導入したいですか？（例：退院支援カンファレンスの標準化、退院後フォローアップの仕組みなど）\n- **アウトカム指標**: 「再入院が減った」かどうかを、どんな指標で測りたいですか？（例：30日以内再入院率、患者満足度、在宅療養日数など）`;
-  } else if (userMsgCount <= 2) {
-    response = `なるほど、かなり研究の輪郭が見えてきましたね！\n\n整理すると：\n- **P（対象）**: 65歳以上の急性期病棟入院患者\n- **I（介入）**: 標準化された多職種連携退院支援プログラム\n- **C（比較）**: 従来の退院支援\n- **O（結果）**: 30日以内再入院率の低下\n\nこれは非常に実現可能性が高く、臨床的意義も大きいテーマですね。もう1点だけ確認させてください：\n- **研究環境**: データ収集が可能な施設や協力体制はありますか？また、倫理審査の見通しはいかがでしょうか？`;
-  } else {
-    response = `素晴らしい情報をありがとうございます。研究の骨子がまとまりました！\n\nこの内容で「整理された研究の骨子」をお出ししますので、次のステップで具体的な研究デザインを検討していきましょう。`;
-  }
-
-  addMessage({ role: 'ai', content: response });
-
-  if (chatHistory.length >= 6 && !state.get('seed.refinedResult')) {
-    setTimeout(() => generateRefinedResult(), 500);
-  }
-}
-
-function showRefineUI() {
   const geminiUIContainer = document.querySelector('#geminiChatUI');
   if (!geminiUIContainer) return;
 
-  const history = (state.get('seed.chatHistory') || []).map(m => m.content).join('\n');
+  if (isDemoMode()) {
+    // デモモード: サンプルレスポンスを使用
+    handleDemoMode(question);
+    return;
+  }
 
-  const prompt = `これまでの対話に基づき、研究の骨子を整理してJSON出力してください。
-以下の3つのうち最適なカテゴリーを選択し、その形式で出力してください。
-
-【出力形式（JSONのみ）】
-{
-  "type": "research" | "practice" | "qi",
-  "theme": "研究テーマ（名詞句として体言止め。「〜に関する研究」など）",
-  "rq": "整理されたリサーチクエスチョン（必ず「〜は〜にどのような影響を与えるか？」などの疑問形で出力すること。実践報告やQIの場合はその目標を疑問形で構文すること）",
-  "target": "対象者（母集団）",
-  "goal": "目的・核心的な到達点",
-  "approaches": [
-    { "name": "アプローチ名", "description": "具体的な方法や工夫の概要" }
-  ]
-}
-
----
-
-【これまでの対話】
-${history}`;
-
-  geminiUIContainer.innerHTML = `
-    <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fef9c3); border: 1px solid #fbbf24; margin: var(--space-4) 0;">
-      <p style="margin: 0 0 var(--space-3); font-weight: 600;">💡 対話が十分に進みました。研究の骨子を生成しましょう。</p>
-      <p style="font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: var(--space-3);">
-        Geminiが出力した骨子（JSON形式でもテキスト形式でもOK）をそのまま貼り付けてください。
-      </p>
-      ${renderGeminiUI({
+  geminiUIContainer.innerHTML = renderGeminiUI({
     prompt: prompt,
-    containerId: 'geminiRefine',
-    label: '研究の骨子を整理',
+    containerId: 'geminiChat',
+    label: 'ブレインストーミング（研究の種の整理）',
     expectJson: false,
-    placeholder: 'Geminiが出力した研究の骨子をここにコピー＆ペーストしてください...',
-  })}
-    </div>
-  `;
+    placeholder: 'Geminiが出力した「📋 研究の骨子」をここにコピー＆ペーストしてください...',
+  });
 
-  attachGeminiListeners(geminiUIContainer, prompt, (response, raw) => {
-    const rawText = raw || response || '';
+  attachGeminiListeners(geminiUIContainer, prompt, (response) => {
+    if (response) {
+      const rawText = response || '';
 
-    // 1. まずJSON形式を試行
-    let parsed = tryParseJSON(rawText);
-
-    // 2. JSONが失敗したらテキスト形式からパース
-    if (!parsed) {
-      parsed = parseTextSkeleton(rawText);
-    }
-
-    if (parsed) {
-      state.set('seed.refinedResult', parsed);
-      const area = document.querySelector('#refinedResultArea');
-      if (area) {
-        area.classList.remove('hidden');
-        area.innerHTML = renderRefinedResult(parsed);
-        attachRefinedResultListeners(area, parsed);
+      // テキストから骨子をパース
+      let parsed = tryParseJSON(rawText);
+      if (!parsed) {
+        parsed = parseTextSkeleton(rawText);
       }
-      geminiUIContainer.innerHTML = '';
-    } else {
-      alert('骨子の内容を判読できませんでした。Geminiが出力した「📋 研究の骨子」の部分をそのまま貼り付けてください。');
+
+      if (parsed) {
+        // 骨子を保存してUIに反映
+        state.set('seed.refinedResult', parsed);
+        const area = document.querySelector('#refinedResultArea');
+        if (area) {
+          area.classList.remove('hidden');
+          area.innerHTML = renderRefinedResult(parsed);
+          attachRefinedResultListeners(area, parsed);
+          area.scrollIntoView({ behavior: 'smooth' });
+        }
+        // 右サイドバーに反映
+        updateSummary('Theme', (parsed.theme || parsed.rq || '').substring(0, 60));
+        updateSummary('RQ', parsed.rq || '');
+
+        // Gemini UIを「完了」状態に
+        geminiUIContainer.innerHTML = `
+          <div class="card" style="background: #f0fdf4; border: 1px solid #86efac; text-align: center; padding: var(--space-4);">
+            <p style="color: #166534; font-weight: 600; margin: 0;">✅ 研究の骨子を取り込みました。下の内容を確認して次へ進んでください。</p>
+          </div>
+        `;
+      } else {
+        alert('骨子の内容を判読できませんでした。Geminiが出力した「📋 研究の骨子」の部分をそのまま貼り付けてください。');
+      }
     }
   });
 }
 
+function handleDemoMode(question) {
+  // デモモード：即座に骨子を生成して表示
+  const result = JSON.parse(DEMO_RESPONSES.rqOverview);
+  state.set('seed.refinedResult', result);
+
+  const geminiUIContainer = document.querySelector('#geminiChatUI');
+  if (geminiUIContainer) {
+    geminiUIContainer.innerHTML = `
+      <div class="card" style="background: #f0fdf4; border: 1px solid #86efac; text-align: center; padding: var(--space-4);">
+        <p style="color: #166534; font-weight: 600; margin: 0;">✅ デモモード：研究の骨子を自動生成しました。下の内容を確認してください。</p>
+      </div>
+    `;
+  }
+
+  const area = document.querySelector('#refinedResultArea');
+  if (area) {
+    area.classList.remove('hidden');
+    area.innerHTML = renderRefinedResult(result);
+    attachRefinedResultListeners(area, result);
+  }
+  // 右サイドバーに反映
+  updateSummary('Theme', (result.theme || result.rq || '').substring(0, 60));
+  updateSummary('RQ', result.rq || '');
+}
+
 function tryParseJSON(text) {
   try {
-    // マークダウンのコードブロック除去
     let cleaned = text.replace(/```json\s*\n?/g, '').replace(/```\s*\n?/g, '').trim();
-    // JSON部分を抽出
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -395,7 +277,6 @@ function tryParseJSON(text) {
 }
 
 function parseTextSkeleton(text) {
-  // テキスト形式の骨子からパースを試みる
   const result = {
     type: 'research',
     theme: '',
@@ -440,7 +321,7 @@ function parseTextSkeleton(text) {
     }
   }
 
-  // 最低限RQがあればパース成功とみなす
+  // 最低限RQがあればパース成功
   if (result.rq) return result;
 
   // RQが見つからなくてもテキストに意味のある内容があれば採用
@@ -451,34 +332,6 @@ function parseTextSkeleton(text) {
   }
 
   return null;
-}
-
-function addMessage(msg) {
-  const history = state.get('seed.chatHistory') || [];
-  history.push(msg);
-  state.set('seed.chatHistory', history);
-
-  const chatContainer = document.querySelector('#chatContainer');
-  if (chatContainer) {
-    chatContainer.insertAdjacentHTML('beforeend', renderChatMessage(msg));
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  }
-}
-
-async function generateRefinedResult() {
-  if (isDemoMode()) {
-    await new Promise(r => setTimeout(r, 800));
-    const result = JSON.parse(DEMO_RESPONSES.rqOverview);
-    state.set('seed.refinedResult', result);
-    const area = document.querySelector('#refinedResultArea');
-    if (area) {
-      area.classList.remove('hidden');
-      area.innerHTML = renderRefinedResult(result);
-      attachRefinedResultListeners(area, result);
-    }
-  } else {
-    showRefineUI();
-  }
 }
 
 function renderRefinedResult(result) {
@@ -498,30 +351,38 @@ function renderRefinedResult(result) {
       </div>
       <div class="ai-response-body">
         <p class="text-muted" style="margin-bottom: var(--space-4); font-size: 0.9rem;">
-          AIが提案したリサーチクエスチョン（RQ）を必要に応じて編集し、納得できる内容になったら「このRQで確定する」ボタンを押してください。
+          取り込まれた内容を確認してください。RQは必要に応じて編集できます。内容がよければ「このRQで確定する」ボタンを押して次へ進んでください。
         </p>
         <div class="format-block">
+          <div class="format-row" style="flex-direction: column; align-items: stretch; gap: var(--space-2); margin-bottom: var(--space-4);">
+            <span class="format-label">${labels.title}:</span>
+            <textarea id="refinedRqInput" class="textarea input-rq" style="min-height: 80px; width: 100%; box-sizing: border-box; overflow: hidden; resize: none; font-size: 0.95rem; line-height: 1.6;" ${isConfirmed ? 'readonly' : ''}>${result.rq || result.title || ''}</textarea>
+          </div>
           <div class="format-row" style="margin-bottom: var(--space-4);">
             <span class="format-label">テーマ:</span>
             <span class="format-value"><strong>${result.theme || result.title || '未設定'}</strong></span>
           </div>
-          <div class="format-row" style="flex-direction: column; align-items: stretch; gap: var(--space-2);">
-            <span class="format-label">${labels.title}:</span>
-            <textarea id="refinedRqInput" class="textarea input-rq" style="min-height: 80px; width: 100%; box-sizing: border-box; overflow: hidden; resize: none; font-size: 0.95rem; line-height: 1.6;" ${isConfirmed ? 'readonly' : ''}>${result.rq || result.title || ''}</textarea>
-          </div>
           <div class="format-row mt-4">
             <span class="format-label">対象:</span>
-            <span class="format-value">${result.target}</span>
+            <span class="format-value">${result.target || '未設定'}</span>
           </div>
           <div class="format-row">
             <span class="format-label">ゴール:</span>
-            <span class="format-value">${result.goal}</span>
+            <span class="format-value">${result.goal || '未設定'}</span>
           </div>
+          ${result.approaches && result.approaches.length > 0 ? `
+          <div style="margin-top: var(--space-4);">
+            <span class="format-label">アプローチ:</span>
+            <ul style="margin-top: var(--space-2); padding-left: var(--space-5);">
+              ${result.approaches.map(a => `<li><strong>${a.name}</strong>: ${a.description}</li>`).join('')}
+            </ul>
+          </div>
+          ` : ''}
         </div>
         
         <div style="margin-top: var(--space-5); text-align: center;">
           <button class="btn ${isConfirmed ? 'btn-secondary' : 'btn-primary'}" id="btnConfirmRq" ${isConfirmed ? 'disabled' : ''}>
-            ${isConfirmed ? '✓ 確定済み' : '✨ このRQで確定する'}
+            ${isConfirmed ? '✓ 確定済み — 次のステップへ進めます' : '✨ このRQで確定する'}
           </button>
         </div>
       </div>
