@@ -6,7 +6,7 @@
 
 const DEFAULT_STATE = {
     // 全体設定
-    demoMode: true,
+    demoMode: false,
     currentStep: 1,
     completedSteps: new Set(),
 
