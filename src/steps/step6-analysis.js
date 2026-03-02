@@ -151,26 +151,97 @@ function runAnalysis() {
     prompt: fullPrompt,
     containerId: 'geminiAnalysis',
     label: '統計分析手法の提案',
-    expectJson: true,
-    placeholder: 'GeminiからのJSON回答をここに貼り付けてください...',
+    expectJson: false,
+    placeholder: 'Geminiが出力した「📋 分析方法提案」をここにコピー＆ペーストしてください...',
   });
 
-  attachGeminiListeners(resultsArea, fullPrompt, (parsed, raw) => {
-    let result;
-    if (parsed) {
-      result = parsed;
-    } else {
-      result = { primaryAnalysis: { method: '提案結果', reason: raw } };
-    }
-    state.set('analysis.aiResult', result);
-    resultsArea.innerHTML = renderAnalysisResults(result);
+  attachGeminiListeners(resultsArea, fullPrompt, (response, raw) => {
+    const rawText = raw || response || '';
 
-    const sumAnalysis = document.querySelector('#sumAnalysis');
-    if (sumAnalysis) {
-      sumAnalysis.textContent = result.primaryAnalysis?.method || '提案済み';
-      sumAnalysis.classList.add('active');
+    // 1. JSON形式を試行
+    let result = null;
+    try {
+      const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*"primaryAnalysis"[\s\S]*\}/);
+      if (jsonMatch) result = JSON.parse(jsonMatch[0]);
+    } catch (_) { /* skip */ }
+
+    // 2. テキスト形式からパース
+    if (!result) {
+      result = parseTextAnalysis(rawText);
     }
-  }, true);
+
+    if (result) {
+      state.set('analysis.aiResult', result);
+      resultsArea.innerHTML = renderAnalysisResults(result);
+
+      const sumAnalysis = document.querySelector('#sumAnalysis');
+      if (sumAnalysis) {
+        sumAnalysis.textContent = result.primaryAnalysis?.method || '提案済み';
+        sumAnalysis.classList.add('active');
+      }
+    } else {
+      alert('提案内容を判読できませんでした。Geminiが出力した「📋 分析方法提案」をそのまま貼り付けてください。');
+    }
+  });
+}
+
+function parseTextAnalysis(text) {
+  const result = {
+    primaryAnalysis: { method: '', reason: '' },
+    secondaryAnalyses: [],
+    effectSize: '',
+    multivariateNeeded: false,
+    multivariateMethod: '',
+    sampleSizeNote: '',
+  };
+
+  // 主解析を探す
+  const primaryMatch = text.match(/主解析\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (primaryMatch) result.primaryAnalysis.method = primaryMatch[1].trim();
+
+  const primaryReasonMatch = text.match(/主解析の理由\s*[:：]\s*([\s\S]*?)(?=(?:副解析|効果量|多変量|サンプル|---|✅|📌|$))/);
+  if (primaryReasonMatch) result.primaryAnalysis.reason = primaryReasonMatch[1].trim();
+
+  // 副解析を探す
+  const secondaryMatch = text.match(/副解析\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (secondaryMatch && secondaryMatch[1].trim()) {
+    const secondaryReasonMatch = text.match(/副解析の理由\s*[:：]\s*([\s\S]*?)(?=(?:効果量|多変量|サンプル|---|✅|📌|$))/);
+    result.secondaryAnalyses.push({
+      method: secondaryMatch[1].trim(),
+      reason: secondaryReasonMatch ? secondaryReasonMatch[1].trim() : '',
+    });
+  }
+
+  // 効果量を探す
+  const effectMatch = text.match(/効果量\s*[:：]\s*([\s\S]*?)(?=(?:多変量|サンプル|---|✅|📌|$))/);
+  if (effectMatch) result.effectSize = effectMatch[1].trim();
+
+  // 多変量解析を探す
+  const multiMatch = text.match(/多変量解析\s*[:：]\s*([\s\S]*?)(?=(?:サンプル|---|✅|📌|$))/);
+  if (multiMatch) {
+    const multiText = multiMatch[1].trim();
+    if (multiText.includes('必要') || multiText.includes('要')) {
+      result.multivariateNeeded = true;
+      result.multivariateMethod = multiText.replace(/必要[。、．]?\s*/, '').trim();
+    }
+  }
+
+  // サンプルサイズを探す
+  const sampleMatch = text.match(/サンプルサイズ概算\s*[:：]\s*([\s\S]*?)(?=(?:---|✅|📌|$))/);
+  if (sampleMatch) result.sampleSizeNote = sampleMatch[1].trim();
+
+  // 最低限主解析があればパース成功
+  if (result.primaryAnalysis.method) return result;
+
+  // テキストの先頭行をフォールバック
+  if (text.trim().length > 30) {
+    result.primaryAnalysis.method = text.trim().split('\n')[0].substring(0, 100);
+    result.primaryAnalysis.reason = text.trim();
+    return result;
+  }
+
+  return null;
 }
 
 function renderAnalysisResults(data) {

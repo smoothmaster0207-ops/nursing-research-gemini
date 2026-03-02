@@ -137,29 +137,45 @@ function suggestQueries() {
     prompt: fullPrompt,
     containerId: 'geminiSuggest',
     label: '検索キーワード・式の提案',
-    expectJson: true,
-    placeholder: 'GeminiからのJSON回答をここに貼り付けてください...',
+    expectJson: false,
+    placeholder: 'Geminiが出力した「📋 検索キーワード」をここにコピー＆ペーストしてください...',
   });
 
-  attachGeminiListeners(area, fullPrompt, (parsed, raw) => {
+  attachGeminiListeners(area, fullPrompt, (response, raw) => {
+    const rawText = raw || response || '';
+
+    // JSON形式を試行
+    let parsed = null;
+    try {
+      const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*"keywordsJa"[\s\S]*\}/);
+      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+    } catch (_) { /* skip */ }
+
+    // テキスト形式からパース
+    if (!parsed) {
+      parsed = parseTextKeywords(rawText);
+    }
+
     if (parsed) {
       state.set('review.suggestedQueries', parsed);
       renderSuggestedQueries(parsed);
 
       const keywordsInput = document.querySelector('#reviewKeywords');
       if (keywordsInput && !keywordsInput.value.trim() && parsed.keywordsJa) {
-        const newKeywords = parsed.keywordsJa.join(' ');
+        const keywords = Array.isArray(parsed.keywordsJa) ? parsed.keywordsJa : [parsed.keywordsJa];
+        const newKeywords = keywords.join(' ');
         keywordsInput.value = newKeywords;
         state.set('review.keywords', newKeywords);
       }
     } else {
       area.innerHTML = `
         <div class="card" style="border-color: var(--color-danger);">
-          <p style="color: var(--color-danger);">⚠️ JSON形式での回答を貼り付けてください。</p>
+          <p style="color: var(--color-danger);">⚠️ 回答を判読できませんでした。Geminiの回答をそのまま貼り付けてください。</p>
         </div>
       `;
     }
-  }, true);
+  });
 }
 
 function renderSuggestedQueries(data) {
@@ -263,17 +279,26 @@ ${checklistSummary}
     prompt: fullPrompt,
     containerId: 'geminiReview',
     label: '背景・意義の論理構成',
-    expectJson: true,
-    placeholder: 'Geminiからの回答をここに貼り付けてください（JSON形式またはテキスト）...',
+    expectJson: false,
+    placeholder: 'Geminiが出力した「📋 研究背景・意義の論理構成案」をここにコピー＆ペーストしてください...',
   });
 
-  attachGeminiListeners(resultsArea, fullPrompt, (parsed, raw) => {
-    let result;
-    if (parsed) {
-      result = parsed;
-    } else {
-      result = { structure: raw };
+  attachGeminiListeners(resultsArea, fullPrompt, (response, raw) => {
+    const rawText = raw || response || '';
+
+    // JSON形式を試行
+    let result = null;
+    try {
+      const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*"structure"[\s\S]*\}/);
+      if (jsonMatch) result = JSON.parse(jsonMatch[0]);
+    } catch (_) { /* skip */ }
+
+    // テキスト形式はそのまま使用
+    if (!result) {
+      result = { structure: rawText };
     }
+
     state.set('review.aiResult', result);
     resultsArea.innerHTML = renderReviewResults(result);
 
@@ -282,7 +307,7 @@ ${checklistSummary}
       sumLit.textContent = '背景構築済み';
       sumLit.classList.add('active');
     }
-  }, true);
+  });
 }
 
 function renderReviewResults(data) {
@@ -304,4 +329,37 @@ function renderReviewResults(data) {
 
 export function validateStep4() {
   return !!state.get('review.aiResult');
+}
+
+function parseTextKeywords(text) {
+  const result = {
+    keywordsJa: [],
+    keywordsEn: [],
+    queryJa: '',
+    queryEn: '',
+  };
+
+  // 日本語キーワードを探す
+  const jaMatch = text.match(/日本語キーワード\s*[:：]\s*(.+?)(?:\n|$)/i);
+  if (jaMatch) {
+    result.keywordsJa = jaMatch[1].split(/[,、，]/).map(k => k.trim()).filter(k => k);
+  }
+
+  // 英語キーワードを探す
+  const enMatch = text.match(/英語キーワード\s*[:：]\s*(.+?)(?:\n|$)/i);
+  if (enMatch) {
+    result.keywordsEn = enMatch[1].split(/[,、，]/).map(k => k.trim()).filter(k => k);
+  }
+
+  // 日本語検索式を探す
+  const queryJaMatch = text.match(/日本語検索式\s*[:：]\s*([\s\S]*?)(?=(?:🌍|英語キーワード|英語検索式|---|✅|📌|$))/i);
+  if (queryJaMatch) result.queryJa = queryJaMatch[1].trim();
+
+  // 英語検索式を探す
+  const queryEnMatch = text.match(/英語検索式\s*[:：]\s*([\s\S]*?)(?=(?:---|✅|📌|$))/i);
+  if (queryEnMatch) result.queryEn = queryEnMatch[1].trim();
+
+  // 最低限キーワードがあれば成功
+  if (result.keywordsJa.length > 0 || result.keywordsEn.length > 0) return result;
+  return null;
 }
