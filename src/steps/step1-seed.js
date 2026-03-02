@@ -341,17 +341,30 @@ ${history}`;
   geminiUIContainer.innerHTML = `
     <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fef9c3); border: 1px solid #fbbf24; margin: var(--space-4) 0;">
       <p style="margin: 0 0 var(--space-3); font-weight: 600;">💡 対話が十分に進みました。研究の骨子を生成しましょう。</p>
+      <p style="font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: var(--space-3);">
+        Geminiが出力した骨子（JSON形式でもテキスト形式でもOK）をそのまま貼り付けてください。
+      </p>
       ${renderGeminiUI({
     prompt: prompt,
     containerId: 'geminiRefine',
     label: '研究の骨子を整理',
-    expectJson: true,
-    placeholder: 'GeminiからのJSON回答をここに貼り付けてください...',
+    expectJson: false,
+    placeholder: 'Geminiが出力した研究の骨子をここにコピー＆ペーストしてください...',
   })}
     </div>
   `;
 
-  attachGeminiListeners(geminiUIContainer, prompt, (parsed, raw) => {
+  attachGeminiListeners(geminiUIContainer, prompt, (response, raw) => {
+    const rawText = raw || response || '';
+
+    // 1. まずJSON形式を試行
+    let parsed = tryParseJSON(rawText);
+
+    // 2. JSONが失敗したらテキスト形式からパース
+    if (!parsed) {
+      parsed = parseTextSkeleton(rawText);
+    }
+
     if (parsed) {
       state.set('seed.refinedResult', parsed);
       const area = document.querySelector('#refinedResultArea');
@@ -362,9 +375,82 @@ ${history}`;
       }
       geminiUIContainer.innerHTML = '';
     } else {
-      alert('JSON形式の回答を貼り付けてください。Geminiの回答から { から始まる部分をコピーしてください。');
+      alert('骨子の内容を判読できませんでした。Geminiが出力した「📋 研究の骨子」の部分をそのまま貼り付けてください。');
     }
-  }, true);
+  });
+}
+
+function tryParseJSON(text) {
+  try {
+    // マークダウンのコードブロック除去
+    let cleaned = text.replace(/```json\s*\n?/g, '').replace(/```\s*\n?/g, '').trim();
+    // JSON部分を抽出
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.rq || parsed.theme || parsed.type) return parsed;
+    }
+  } catch (_) { /* skip */ }
+  return null;
+}
+
+function parseTextSkeleton(text) {
+  // テキスト形式の骨子からパースを試みる
+  const result = {
+    type: 'research',
+    theme: '',
+    rq: '',
+    target: '',
+    goal: '',
+    approaches: [],
+  };
+
+  // リサーチクエスチョン（RQ）を探す
+  const rqMatch = text.match(/リサーチクエスチョン[（(]?RQ[)）]?\s*[:：]\s*(.+?)(?:\n|$)/i) ||
+    text.match(/RQ\s*[:：]\s*(.+?)(?:\n|$)/i);
+  if (rqMatch) result.rq = rqMatch[1].trim();
+
+  // 研究デザインを探す
+  const designMatch = text.match(/研究デザイン\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (designMatch) result.theme = designMatch[1].trim();
+
+  // 対象を探す
+  const targetMatch = text.match(/対象\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (targetMatch) result.target = targetMatch[1].trim();
+
+  // 最終ゴールを探す
+  const goalMatch = text.match(/最終ゴール\s*[:：]\s*(.+?)(?:\n|$)/);
+  if (goalMatch) result.goal = goalMatch[1].trim();
+
+  // テーマがない場合はRQから生成
+  if (!result.theme && result.rq) {
+    result.theme = result.rq.replace(/[？?]$/, '').substring(0, 60);
+  }
+
+  // 量的フェーズ・質的フェーズなどをアプローチとして抽出
+  const phaseMatches = text.matchAll(/(?:量的|質的|STEP\s*\d+|フェーズ)[^:：]*[:：]\s*([\s\S]*?)(?=(?:量的|質的|STEP\s*\d+|フェーズ|最終ゴール|---|\n\n|$))/gi);
+  for (const match of phaseMatches) {
+    const content = match[0].trim();
+    const nameMatch = content.match(/^(.+?)[:：]/);
+    if (nameMatch) {
+      result.approaches.push({
+        name: nameMatch[1].trim(),
+        description: content.substring(nameMatch[0].length).trim().replace(/\n/g, ' ').substring(0, 200),
+      });
+    }
+  }
+
+  // 最低限RQがあればパース成功とみなす
+  if (result.rq) return result;
+
+  // RQが見つからなくてもテキストに意味のある内容があれば採用
+  if (text.trim().length > 30) {
+    result.rq = text.trim().split('\n')[0].substring(0, 200);
+    result.goal = text.trim();
+    return result;
+  }
+
+  return null;
 }
 
 function addMessage(msg) {
