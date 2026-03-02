@@ -191,6 +191,23 @@ function renderProposal(draft) {
         📑 PDF形式でダウンロード
       </button>
     </div>
+
+    <div style="margin-top: var(--space-6); background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border: 1px solid #f0c36d; border-radius: var(--radius-md); padding: var(--space-5);">
+      <div style="display: flex; gap: var(--space-3); align-items: flex-start;">
+        <div style="font-size: 1.5rem; line-height: 1;">⚠️</div>
+        <div>
+          <p style="font-weight: bold; color: #856404; margin-bottom: var(--space-2); font-size: 1.05rem;">この計画書はAIが生成した「草案」です</p>
+          <ul style="color: #856404; font-size: var(--font-size-sm); line-height: 1.8; padding-left: var(--space-5); margin: 0;">
+            <li>本草案はAI（Gemini）によって自動生成されたものであり、<strong>そのまま提出することは推奨しません</strong>。</li>
+            <li>記載内容が<strong>ご自身の研究環境・施設の実情に沿っているか</strong>必ず確認し、修正してください。</li>
+            <li>引用文献は「出典確認中」と表記されている場合があります。<strong>実在する文献を自身で検索し差し替えてください</strong>。</li>
+            <li><strong>倫理審査委員会（IRB）へ提出する前に</strong>、指導教員や研究倫理の専門家にレビューを依頼してください。</li>
+            <li>統計手法やサンプルサイズの妥当性は、<strong>統計の専門家に相談する</strong>ことを強く推奨します。</li>
+            <li>AIが生成した文章をそのまま使用する場合、<strong>所属機関のAI利用ポリシー</strong>を確認してください。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   `;
 }
 
